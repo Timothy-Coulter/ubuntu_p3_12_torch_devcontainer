@@ -1,0 +1,24 @@
+# Example dataset/model path registry.
+# Copy to configs/data_paths.yaml and customize as needed. Keep secrets out of Git.
+# You can reference environment variables like ${DATA_DIR} which is mounted to host ~/data in the devcontainer.
+
+defaults:
+  data_root: ${DATA_DIR:-${PWD}/data}
+  hf_cache: ${HF_HOME:-/home/vscode/.cache/huggingface}
+  torch_cache: ${TORCH_HOME:-/home/vscode/.cache/torch}
+
+datasets:
+  mnist:
+    path: ${DATA_DIR:-${PWD}/data}/mnist
+  imagenet:
+    path: ${DATA_DIR:-${PWD}/data}/imagenet
+  custom_csv:
+    path: ${DATA_DIR:-${PWD}/data}/custom_csv
+
+models:
+  local_checkpoints: ${DATA_DIR:-${PWD}/data}/checkpoints
+  huggingface_cache: ${HF_HOME:-/home/vscode/.cache/huggingface}
+
+notes:
+  - Ensure DATA_DIR is mounted from host to keep large datasets out of the container filesystem.
+  - Hugging Face and Torch caches are bound to host defaults for reuse across projects.
