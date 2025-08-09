@@ -21,12 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (system-wide)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && uv --version
 
-# App user
-ARG APP_USER=app
-ARG APP_UID=1000
-ARG APP_GID=1000
-RUN groupadd -g ${APP_GID} ${APP_USER} && \
-    useradd -m -s /bin/bash -u ${APP_UID} -g ${APP_GID} ${APP_USER}
+# App user: reuse existing 'vscode' user from base image to avoid UID/GID conflicts
+ARG APP_USER=vscode
+# Using the existing vscode user; no need to create user/group
 
 # Cache and data directories (these will be bound to host volumes at runtime)
 ENV HOME=/home/${APP_USER}
@@ -47,29 +44,8 @@ VOLUME ["${HF_HOME}", "${TORCH_HOME}", "${KAGGLE_CONFIG_DIR}", "/workspace/data"
 WORKDIR /workspace
 USER ${APP_USER}
 
-# Create a project venv and install dependencies using uv.
-# Copy only the lock & metadata first for better caching; will copy the rest later.
-COPY --chown=${APP_USER}:${APP_USER} pyproject.toml /workspace/pyproject.toml
-# Optional: include lock file if present for deterministic builds
-# COPY --chown=${APP_USER}:${APP_USER} uv.lock /workspace/uv.lock
-
-# Ensure Python 3.12 and venv are present, then sync project deps (except torch CUDA, installed below).
-RUN uv python install 3.12 && \
-    uv venv .venv -p 3.12 && \
-    . .venv/bin/activate && \
-    uv sync --frozen || uv sync
-
-# Install PyTorch CUDA 12.4 wheels. Requires host NVIDIA driver and nvidia-container-toolkit at runtime.
-# If you want CPU-only images, remove the index-url and install default wheels.
-RUN . .venv/bin/activate && \
-    uv pip install --upgrade --index-url https://download.pytorch.org/whl/cu124 torch torchvision torchaudio
-
-# Copy the remainder of the repository
-COPY --chown=${APP_USER}:${APP_USER} . /workspace
-
-# Register a Jupyter kernel for convenience
-RUN . .venv/bin/activate && \
-    python -m ipykernel install --user --name torch_starter-3.12 --display-name "Python 3.12 (torch_starter)"
+# Development dependencies and the virtual environment are created during container postCreate (see devcontainer.json).
+# We avoid copying project files or installing Python packages at build time to keep images small and builds fast.
 
 # Expose a common Jupyter port if needed
 EXPOSE 8888

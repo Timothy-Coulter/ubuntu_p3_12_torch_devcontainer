@@ -3,17 +3,17 @@
     "preferredMode": "code",
     "mcpServersConfig": ".mcp/servers.json",
     "scripts": {
-        "format": "./.dev.sh format",
-        "lint": "./.dev.sh lint",
-        "lint-fix": "./.dev.sh lint-fix",
-        "fix-imports": "./.dev.sh fix-imports",
-        "typecheck": "./.dev.sh typecheck",
-        "test": "./.dev.sh test",
-        "all-checks": "./.dev.sh all-checks",
-        "sync": "./.dev.sh sync",
-        "lock-update": "./.dev.sh lock-update",
-        "clean": "./.dev.sh clean",
-        "verify-setup": "./.dev.sh verify-setup",
-        "setup-keys": "./.dev.sh setup-keys"
+        "format": "bash ./.dev.sh format",
+        "lint": "bash ./.dev.sh lint",
+        "lint-fix": "bash ./.dev.sh lint-fix",
+        "fix-imports": "bash ./.dev.sh fix-imports",
+        "typecheck": "bash ./.dev.sh typecheck",
+        "test": "bash ./.dev.sh test",
+        "all-checks": "bash ./.dev.sh all-checks",
+        "sync": "bash ./.dev.sh sync",
+        "lock-update": "bash ./.dev.sh lock-update",
+        "clean": "bash ./.dev.sh clean",
+        "verify-setup": "bash ./.dev.sh verify-setup",
+        "setup-keys": "bash ./.dev.sh setup-keys"
     }
 }

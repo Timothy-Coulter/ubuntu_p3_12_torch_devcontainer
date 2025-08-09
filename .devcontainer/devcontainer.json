@@ -14,7 +14,8 @@
         "HF_HOME": "/home/vscode/.cache/huggingface",
         "TRANSFORMERS_CACHE": "/home/vscode/.cache/huggingface",
         "TORCH_HOME": "/home/vscode/.cache/torch",
-        "KAGGLE_CONFIG_DIR": "/home/vscode/.kaggle"
+        "KAGGLE_CONFIG_DIR": "/home/vscode/.kaggle",
+        "UV_LINK_MODE": "copy"
     },
     "mounts": [
         "source=${localEnv:USERPROFILE}/.cache/huggingface,target=/home/vscode/.cache/huggingface,type=bind,consistency=cached",
@@ -24,7 +25,7 @@
     ],
     "initializeCommand": "powershell -NoProfile -Command \"$u=$env:USERPROFILE; if (-not [string]::IsNullOrEmpty($u)) { New-Item -ItemType Directory -Force -Path $u+'\\\\.cache\\\\huggingface',$u+'\\\\.cache\\\\torch',$u+'\\\\.kaggle',$u+'\\\\data' | Out-Null }\"",
     "features": {},
-    "postCreateCommand": "set -euo pipefail; if ! command -v uv &> /dev/null; then echo 'uv missing'; exit 1; fi; uv python install 3.12; uv venv .venv -p 3.12; . .venv/bin/activate; uv sync --extra dev --extra notebook; uv pip install --upgrade --index-url https://download.pytorch.org/whl/cu124 torch torchvision torchaudio; python -m ipykernel install --user --name torch_starter-3.12 --display-name 'Python 3.12 (torch_starter)'; chmod +x .dev.sh || true; chmod +x verify_setup/*.sh || true; echo 'Post-create completed.'",
+    "postCreateCommand": "bash -lc \"set -euo pipefail; export UV_LINK_MODE=copy; export UV_VENV_CLEAR=1; if ! command -v uv >/dev/null 2>&1; then echo 'uv missing'; exit 1; fi; uv python install 3.12; uv venv --clear .venv -p 3.12; source .venv/bin/activate; uv sync --index-strategy unsafe-best-match --extra dev --extra notebook --extra torch-cu124; python -m ipykernel install --user --name torch_starter-3.12 --display-name \\\"Python 3.12 (torch_starter)\\\"; echo 'Post-create completed.'\"",
     "customizations": {
         "vscode": {
             "extensions": [

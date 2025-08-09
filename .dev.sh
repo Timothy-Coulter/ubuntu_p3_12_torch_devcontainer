@@ -84,13 +84,11 @@ cmd_clean() {
 }
 
 cmd_verify_setup() {
-  chmod +x "${ROOT_DIR}/verify_setup/verify_setup.sh" 2>/dev/null || true
-  "${ROOT_DIR}/verify_setup/verify_setup.sh"
+  bash "${ROOT_DIR}/verify_setup/verify_setup.sh"
 }
 
 cmd_setup_keys() {
-  chmod +x "${ROOT_DIR}/verify_setup/setup_api_keys.sh" 2>/dev/null || true
-  "${ROOT_DIR}/verify_setup/setup_api_keys.sh"
+  bash "${ROOT_DIR}/verify_setup/setup_api_keys.sh"
 }
 
 usage() {

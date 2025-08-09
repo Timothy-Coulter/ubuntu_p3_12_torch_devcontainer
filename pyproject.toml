@@ -95,5 +95,27 @@ addopts = "-q --disable-warnings"
 testpaths = ["tests"]
 
 [tool.uv]
-# uv specific behavior can be adjusted here if needed
-# e.g., "preview" = true
+# uv configuration for this project
+# preview = true
+"index-strategy" = "unsafe-best-match"
+
+# Primary index: PyPI (listed first so it wins for general packages like requests)
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
+# Secondary index: PyTorch CUDA 12.4 wheels (used explicitly via sources below)
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu124"
+
+[tool.uv.sources]
+# Route only torch packages to the PyTorch index; everything else resolves from PyPI
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+torchaudio = { index = "pytorch" }
+
+# Force key ecosystem packages to resolve from PyPI to avoid partial mirrors on the PyTorch index
+requests = { index = "pypi" }
+jupyterlab = { index = "pypi" }
+"jupyterlab-server" = { index = "pypi" }

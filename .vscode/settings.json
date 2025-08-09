@@ -20,6 +20,9 @@
     "**/.ruff_cache": true,
     "**/.pytest_cache": true
   },
+  "files.watcherExclude": {
+    "**/.venv/**": true
+  },
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.organizeImports.ruff": "explicit",
