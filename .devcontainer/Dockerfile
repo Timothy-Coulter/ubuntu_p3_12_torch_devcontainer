@@ -47,32 +47,38 @@ ENV UV_LINK_MODE=copy \
     UV_VENV_CLEAR=1
 
 # OPTIMIZATION: Copy dependency files first (cached layer unless dependencies change)
-COPY --chown=${APP_USER}:${APP_USER} pyproject.toml uv.lock ./
+COPY --chown=${APP_USER}:${APP_USER} pyproject.toml uv.lock README.md ./
 
-# OPTIMIZATION: Install Python and create virtual environment with all dependencies at build time
-RUN set -euo pipefail && \
+# OPTIMIZATION PHASE 1: Install Python and external dependencies only (cached unless dependencies change)
+RUN /bin/bash -euo pipefail -c " \
     uv python install 3.12 && \
     uv venv --clear .venv -p 3.12 && \
     . .venv/bin/activate && \
-    uv sync --index-strategy unsafe-best-match --extra dev --extra notebook --extra torch-cu124 && \
-    echo "✅ All dependencies installed successfully"
+    uv sync --no-install-project --index-strategy unsafe-best-match --extra dev --extra notebook --extra torch-cu124 && \
+    echo '✅ External dependencies installed successfully'"
 
-# OPTIMIZATION: Setup Jupyter kernel at build time
-RUN set -euo pipefail && \
-    . .venv/bin/activate && \
-    python -m ipykernel install --user --name torch_starter-3.12 --display-name "Python 3.12 (torch_starter)" && \
-    echo "✅ Jupyter kernel installed"
-
-# OPTIMIZATION: Copy source code last (this layer rebuilds when source changes, but deps are cached)
+# OPTIMIZATION PHASE 2: Copy source code (this layer rebuilds when source changes, but deps are cached)
 COPY --chown=${APP_USER}:${APP_USER} . .
 
-# Validate environment is working (but don't fail build if optional components missing)
-RUN set -euo pipefail && \
+# OPTIMIZATION PHASE 2: Install local package as editable
+RUN /bin/bash -euo pipefail -c " \
     . .venv/bin/activate && \
-    python -c "import sys; print(f'Python {sys.version}')" && \
-    python -c "import torch; print(f'PyTorch {torch.__version__}')" && \
-    python -c "import transformers; print(f'Transformers {transformers.__version__}')" && \
-    echo "✅ Environment validation completed"
+    uv pip install -e . && \
+    echo '✅ Local package installed successfully'"
+
+# OPTIMIZATION: Setup Jupyter kernel at build time
+RUN /bin/bash -euo pipefail -c " \
+    . .venv/bin/activate && \
+    python -m ipykernel install --user --name torch_starter-3.12 --display-name 'Python 3.12 (torch_starter)' && \
+    echo '✅ Jupyter kernel installed'"
+
+# Validate environment is working (but don't fail build if optional components missing)
+RUN /bin/bash -euo pipefail -c " \
+    . .venv/bin/activate && \
+    python -c \"import sys; print(f'Python {sys.version}')\" && \
+    python -c \"import torch; print(f'PyTorch {torch.__version__}')\" && \
+    python -c \"import transformers; print(f'Transformers {transformers.__version__}')\" && \
+    echo '✅ Environment validation completed'"
 
 # Expose common ports
 EXPOSE 8888 8000
