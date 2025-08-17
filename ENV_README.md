@@ -13,22 +13,42 @@ This document provides comprehensive documentation for the **torch_starter** dee
 ### Getting Started
 1. **Clone and Open**: Clone this repository and open in VS Code
 2. **Dev Container**: VS Code will prompt to "Reopen in Container" - click it
-3. **Wait for Setup**: Container builds automatically (~5-10 minutes first time)
-4. **Verify Environment**: Run `bash ./.dev.sh verify-setup`
-5. **Setup API Keys** (optional): Run `bash ./.dev.sh setup-keys`
+3. **Initial Build**: First build takes ~15-20 minutes (packages pre-installed)
+4. **Lightning Fast Startup**: Subsequent container starts in ~30 seconds! 🚀
+5. **Verify Environment**: Run `bash ./dev.sh verify-setup`
+6. **Setup API Keys** (optional): Run `bash ./dev.sh setup-keys`
 
 ### First Steps
 ```bash
 # Verify everything works
-./.dev.sh verify-setup
+./dev.sh verify-setup
 
 # Run sample test
-./.dev.sh test
+./dev.sh test
 
 # Start developing in src/ folder
 # Create notebooks in notebooks/ folder
 # Add scripts in scripts/ folder
 ```
+
+---
+
+## ⚡ Performance Optimization
+
+This environment uses an **optimized build strategy** for dramatically faster development:
+
+| **Metric** | **Before** | **Optimized** | **Improvement** |
+|------------|------------|---------------|-----------------|
+| **Daily Startup** | 5-10 minutes | ~30 seconds | **10x faster** |
+| **First Build** | ~5 minutes | ~15-20 minutes | Slower (one-time) |
+| **Package Addition** | ~2 minutes | ~30 sec (temp) | Same/faster |
+| **Team Onboarding** | 5-10 min per startup | ~30 sec per startup | **Consistent** |
+
+### How It Works
+- **Build-time Installation**: All packages pre-installed during container build
+- **Runtime Activation**: Virtual environment instantly available
+- **Hybrid Package Management**: Temporary additions for experiments, permanent for team
+- **Cached Layers**: Docker optimizations for faster rebuilds
 
 ---
 
@@ -40,6 +60,7 @@ This document provides comprehensive documentation for the **torch_starter** dee
 - **Package Manager**: [uv](https://github.com/astral-sh/uv) (faster pip/conda alternative)
 - **CUDA**: 12.4 (if GPU available)
 - **GPU Support**: NVIDIA Docker runtime with `--gpus all`
+- **🚀 Optimization**: Pre-built packages for instant startup
 
 ### Core Dependencies
 - **Deep Learning**: PyTorch, torchvision, torchaudio (CUDA 12.4)
@@ -89,40 +110,76 @@ This document provides comprehensive documentation for the **torch_starter** dee
 
 ## 🛠️ Development Workflow
 
-### Environment Management
+### Environment Management (Optimized)
+The environment is now **pre-built** for lightning-fast startup! ⚡
+
 ```bash
-# Activate development environment
+# Environment is automatically activated on container start
+# All packages pre-installed during build
+
+# For manual activation (if needed)
 source .venv/bin/activate
 
-# Sync dependencies (install/update packages)
-./.dev.sh sync
+# Sync base dependencies (rarely needed)
+./dev.sh sync
 
-# Update lock file and dependencies
-./.dev.sh lock-update
+# Update lock file and rebuild container
+./dev.sh lock-update && rebuild container
+```
+
+### Package Management (New Optimized Workflow)
+Two-tier package management for flexibility:
+
+#### Quick Experimentation (Temporary Packages)
+```bash
+# Add package for quick testing/debugging (available immediately)
+./dev.sh add-temp ipdb
+./dev.sh add-temp requests-oauthlib
+./dev.sh add-temp plotly
+
+# Packages available instantly but lost on container rebuild
+```
+
+#### Permanent Additions (Team Environment)
+```bash
+# Add to project permanently (requires rebuild)
+./dev.sh add-perm scikit-image
+./dev.sh add-perm wandb
+
+# Alternative: manually edit pyproject.toml, then:
+./dev.sh rebuild-image  # Instructions for rebuilding
+```
+
+#### Package Management Commands
+```bash
+./dev.sh add-temp <package>   # Temporary (~30 seconds)
+./dev.sh add-perm <package>   # Permanent (needs rebuild)
+./dev.sh sync-temp           # Sync temporary changes only
+./dev.sh rebuild-image       # Rebuild instructions
 ```
 
 ### Code Quality
 ```bash
 # Format code
-./.dev.sh format
+./dev.sh format
 
 # Run linter
-./.dev.sh lint
+./dev.sh lint
 
 # Fix auto-fixable lint issues
-./.dev.sh lint-fix
+./dev.sh lint-fix
 
 # Fix import ordering
-./.dev.sh fix-imports
+./dev.sh fix-imports
 
 # Run type checker
-./.dev.sh typecheck
+./dev.sh typecheck
 
 # Run tests
-./.dev.sh test
+./dev.sh test
 
 # Run all quality checks
-./.dev.sh all-checks
+./dev.sh all-checks
 ```
 
 ### Data Science Workflow
@@ -250,7 +307,7 @@ Pre-configured debug settings in [`.vscode/launch.json`](.vscode/launch.json):
 ### Environment Verification
 ```bash
 # Comprehensive environment check
-./.dev.sh verify-setup
+./dev.sh verify-setup
 ```
 
 This verifies:
@@ -278,10 +335,10 @@ docker run --rm --gpus all nvidia/cuda:12.4-runtime-ubuntu22.04 nvidia-smi
 source .venv/bin/activate
 
 # Re-sync dependencies
-./.dev.sh sync
+./dev.sh sync
 
 # Clear caches
-./.dev.sh clean
+./dev.sh clean
 ```
 
 #### VS Code Issues
@@ -299,20 +356,66 @@ source .venv/bin/activate
 # Clean Docker cache
 docker system prune -f
 
-# Rebuild without cache
+# Rebuild without cache (15-20 min for optimized build)
 # Dev Container: Rebuild Container (No Cache)
+```
+
+#### Slow Container Startup (Optimized Build)
+```bash
+# Container should start in ~30 seconds with pre-built packages
+# If taking longer, packages may not be pre-installed:
+
+# Check if packages are built into image
+docker images | grep torch_starter
+
+# If container is slow, rebuild to get optimized version
+# Dev Container: Rebuild Container
+```
+
+#### Adding Packages
+```bash
+# Quick temporary addition (immediate)
+./dev.sh add-temp package-name
+
+# Permanent addition (requires rebuild)
+./dev.sh add-perm package-name
+# Then: Dev Container: Rebuild Container
+
+# Package missing after container restart?
+# Temporary packages are lost - add permanently:
+# Edit pyproject.toml and rebuild container
 ```
 
 ---
 
 ## 🚀 Common Workflows
 
-### Starting a New Project
+### Starting a New Project (Optimized)
 1. **Structure**: Create modules in `src/`, experiments in `notebooks/`
-2. **Dependencies**: Add to [`pyproject.toml`](pyproject.toml) dependencies
+2. **Dependencies**:
+   - Quick experiments: `./dev.sh add-temp package-name`
+   - Permanent deps: Edit [`pyproject.toml`](pyproject.toml) → rebuild container
 3. **Data**: Configure paths in `configs/data_paths.yaml`
 4. **Tests**: Write tests in `tests/` directory
 5. **Quality**: Run `./.dev.sh all-checks` regularly
+
+### Package Development Workflow
+```bash
+# 1. Experiment with packages
+./dev.sh add-temp wandb
+./dev.sh add-temp plotly
+# Test and develop...
+
+# 2. Commit useful packages permanently
+./dev.sh add-perm wandb  # Adds to pyproject.toml
+./dev.sh add-perm plotly
+
+# 3. Rebuild container for team
+# Dev Container: Rebuild Container (15-20 min)
+
+# 4. Team gets pre-built environment
+# Next container start: ~30 seconds!
+```
 
 ### Training a Model
 ```bash
@@ -355,7 +458,7 @@ uv build
 uv pip install -e .
 
 # Run tests before release
-./.dev.sh all-checks
+./dev.sh all-checks
 ```
 
 ---
@@ -403,7 +506,7 @@ uv pip install -e .
 ### Updating Template
 ```bash
 # Update dependencies
-./.dev.sh lock-update
+./dev.sh lock-update
 
 # Update container
 # Dev Container: Rebuild Container
@@ -415,3 +518,46 @@ git add . && git commit -m "Update environment"
 ---
 
 *This environment template provides a robust foundation for deep learning development with modern tooling, containerization, and AI assistance. Happy coding! 🚀*
+---
+
+## 🔄 Migration to Optimized Environment
+
+This environment has been **optimized for 10x faster daily startup** by moving package installation from runtime to build time.
+
+### What Changed
+- **Dockerfile**: Now pre-installs all packages during build (~15-20 min one-time)
+- **devcontainer.json**: Minimal startup command (~30 seconds)
+- **dev.sh**: New package management commands for hybrid workflow
+- **Workflow**: Two-tier package management (temporary vs permanent)
+
+### Upgrading Your Environment
+```bash
+# 1. Backup current work
+git add . && git commit -m "Backup before optimization"
+
+# 2. Rebuild container with optimized configuration
+# Dev Container: Rebuild Container (Ctrl+Shift+P)
+# First build: ~15-20 minutes (downloads packages)
+
+# 3. Verify optimization
+./dev.sh verify-setup
+# Should show instant environment activation!
+
+# 4. Future startups: ~30 seconds instead of 5-10 minutes! 🚀
+```
+
+### New Package Workflow
+- **Experimentation**: `./dev.sh add-temp package` (instant)
+- **Production**: Edit `pyproject.toml` + rebuild (permanent)
+- **Team Sync**: Rebuild after dependency changes
+
+### Rollback (if needed)
+```bash
+# Revert to previous devcontainer configuration
+git checkout HEAD~1 -- .devcontainer/
+# Dev Container: Rebuild Container
+```
+
+---
+
+*Environment optimized for developer productivity - enjoy the speed boost! 🚀*

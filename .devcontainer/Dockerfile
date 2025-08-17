@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Ubuntu 24.04 base with smallest common tooling; we'll install uv and Python via uv.
+# Ubuntu 24.04 base with optimized package installation at build time
 FROM mcr.microsoft.com/vscode/devcontainers/base:ubuntu-24.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Core OS deps
+# Core OS dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git git-lfs \
     build-essential pkg-config \
@@ -21,34 +21,61 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (system-wide)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && uv --version
 
-# App user: reuse existing 'vscode' user from base image to avoid UID/GID conflicts
+# App user: reuse existing 'vscode' user from base image
 ARG APP_USER=vscode
-# Using the existing vscode user; no need to create user/group
-
-# Cache and data directories (these will be bound to host volumes at runtime)
 ENV HOME=/home/${APP_USER}
+
+# Cache and data directories (will be bound to host volumes at runtime)
 ENV HF_HOME=${HOME}/.cache/huggingface \
     TRANSFORMERS_CACHE=${HOME}/.cache/huggingface \
     TORCH_HOME=${HOME}/.cache/torch \
     KAGGLE_CONFIG_DIR=${HOME}/.kaggle \
-    DATA_DIR=/workspace/data
+    DATA_DIR=/workspaces/data
 
 RUN mkdir -p ${HF_HOME} ${TORCH_HOME} ${KAGGLE_CONFIG_DIR} ${DATA_DIR} && \
-    chown -R ${APP_USER}:${APP_USER} ${HOME} /workspace
+    chown -R ${APP_USER}:${APP_USER} ${HOME} /workspaces
 
-# Declare volumes so users can mount host caches easily:
-# - On Linux: mount ${HOME}/.cache/huggingface, ${HOME}/.cache/torch, ${HOME}/.kaggle, and ~/data
-# - On Windows (Docker Desktop/WSL): mount %USERPROFILE% equivalents or WSL paths
-VOLUME ["${HF_HOME}", "${TORCH_HOME}", "${KAGGLE_CONFIG_DIR}", "/workspace/data"]
+# Declare volumes for host cache mounting
+VOLUME ["${HF_HOME}", "${TORCH_HOME}", "${KAGGLE_CONFIG_DIR}", "/workspaces/data"]
 
-WORKDIR /workspace
+# Set working directory and switch to app user
+WORKDIR /workspaces
 USER ${APP_USER}
 
-# Development dependencies and the virtual environment are created during container postCreate (see devcontainer.json).
-# We avoid copying project files or installing Python packages at build time to keep images small and builds fast.
+# Environment variables for uv optimization
+ENV UV_LINK_MODE=copy \
+    UV_VENV_CLEAR=1
 
-# Expose a common Jupyter port if needed
-EXPOSE 8888
+# OPTIMIZATION: Copy dependency files first (cached layer unless dependencies change)
+COPY --chown=${APP_USER}:${APP_USER} pyproject.toml uv.lock ./
+
+# OPTIMIZATION: Install Python and create virtual environment with all dependencies at build time
+RUN set -euo pipefail && \
+    uv python install 3.12 && \
+    uv venv --clear .venv -p 3.12 && \
+    . .venv/bin/activate && \
+    uv sync --index-strategy unsafe-best-match --extra dev --extra notebook --extra torch-cu124 && \
+    echo "✅ All dependencies installed successfully"
+
+# OPTIMIZATION: Setup Jupyter kernel at build time
+RUN set -euo pipefail && \
+    . .venv/bin/activate && \
+    python -m ipykernel install --user --name torch_starter-3.12 --display-name "Python 3.12 (torch_starter)" && \
+    echo "✅ Jupyter kernel installed"
+
+# OPTIMIZATION: Copy source code last (this layer rebuilds when source changes, but deps are cached)
+COPY --chown=${APP_USER}:${APP_USER} . .
+
+# Validate environment is working (but don't fail build if optional components missing)
+RUN set -euo pipefail && \
+    . .venv/bin/activate && \
+    python -c "import sys; print(f'Python {sys.version}')" && \
+    python -c "import torch; print(f'PyTorch {torch.__version__}')" && \
+    python -c "import transformers; print(f'Transformers {transformers.__version__}')" && \
+    echo "✅ Environment validation completed"
+
+# Expose common ports
+EXPOSE 8888 8000
 
 # Proper signal handling
 ENTRYPOINT ["/usr/bin/tini", "--"]

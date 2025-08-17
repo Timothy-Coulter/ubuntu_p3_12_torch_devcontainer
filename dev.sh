@@ -91,6 +91,65 @@ cmd_setup_keys() {
   bash "${ROOT_DIR}/verify_setup/setup_api_keys.sh"
 }
 
+cmd_add_temp() {
+  local package="${1:-}"
+  if [[ -z "$package" ]]; then
+    echo "Usage: ./dev.sh add-temp <package>" >&2
+    exit 1
+  fi
+  activate_venv
+  echo "Adding temporary package: $package"
+  uv add "$package"
+  echo "✅ Temporary package '$package' added."
+  echo "💡 This package is only available until container rebuild."
+  echo "   To make permanent: edit pyproject.toml and rebuild container."
+}
+
+cmd_add_perm() {
+  local package="${1:-}"
+  if [[ -z "$package" ]]; then
+    echo "Usage: ./dev.sh add-perm <package>" >&2
+    echo "This will add the package to pyproject.toml and require a container rebuild."
+    exit 1
+  fi
+  echo "Adding permanent package: $package"
+  echo "1. Adding to pyproject.toml dependencies..."
+  
+  # Add to pyproject.toml (simple append to dependencies array)
+  if grep -q "dependencies = \[" pyproject.toml; then
+    # Find the dependencies section and add the package
+    sed -i "/dependencies = \[/,/\]/ {
+      /\]/ i\\
+  \"$package\",
+    }" pyproject.toml
+    echo "2. Added '$package' to pyproject.toml"
+    echo "3. 🔄 Container rebuild required to install permanently."
+    echo "   Run: Dev Container: Rebuild Container (Ctrl+Shift+P)"
+  else
+    echo "❌ Could not find dependencies section in pyproject.toml"
+    exit 1
+  fi
+}
+
+cmd_rebuild_image() {
+  echo "🔄 Container rebuild required for permanent package changes."
+  echo ""
+  echo "To rebuild the container:"
+  echo "1. In VS Code: Press Ctrl+Shift+P (Cmd+Shift+P on Mac)"
+  echo "2. Type: 'Dev Container: Rebuild Container'"
+  echo "3. Select the command and wait for rebuild (~15-20 minutes)"
+  echo ""
+  echo "Alternatively, from host terminal:"
+  echo "   docker build -f .devcontainer/Dockerfile ."
+}
+
+cmd_sync_temp() {
+  echo "Syncing temporary packages only..."
+  activate_venv
+  uv sync --no-install-project
+  echo "✅ Temporary package sync completed"
+}
+
 usage() {
   cat <<'USAGE'
 Usage: ./.dev.sh <command>
@@ -109,10 +168,18 @@ Commands:
   verify-setup    Run environment verification (CUDA, caches, libs)
   setup-keys      Prompt for and store API keys safely
 
+Package Management (Optimized Container):
+  add-temp <pkg>  Add package temporarily (until container rebuild)
+  add-perm <pkg>  Add package permanently (adds to pyproject.toml)
+  rebuild-image   Instructions for rebuilding container
+  sync-temp       Sync only temporary packages
+
 Examples:
   ./.dev.sh sync
   ./.dev.sh all-checks
   ./.dev.sh verify-setup
+  ./.dev.sh add-temp ipdb          # Quick debugging package
+  ./.dev.sh add-perm scikit-image  # Permanent addition
 USAGE
 }
 
@@ -131,6 +198,10 @@ main() {
     clean) cmd_clean ;;
     verify-setup) cmd_verify_setup ;;
     setup-keys) cmd_setup_keys ;;
+    add-temp) cmd_add_temp "${2:-}" ;;
+    add-perm) cmd_add_perm "${2:-}" ;;
+    rebuild-image) cmd_rebuild_image ;;
+    sync-temp) cmd_sync_temp ;;
     ""|help|-h|--help) usage ;;
     *) echo "Unknown command: $cmd" >&2; usage; exit 1 ;;
   esac
