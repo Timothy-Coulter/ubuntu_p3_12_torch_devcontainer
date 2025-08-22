@@ -1,0 +1,10 @@
+# .github/workflows/security.yml  
+name: Security Scan
+on: [push]
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Safety
+        uses: pyupio/safety-action@v1

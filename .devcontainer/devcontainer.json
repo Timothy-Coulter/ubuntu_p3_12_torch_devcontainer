@@ -1,8 +1,11 @@
 {
-    "name": "torch_starter-optimized (CUDA 12.4, uv, Py3.12)",
+    "name": "torch_starter-optimized (CUDA 13.0, uv, Py3.12)",
     "build": {
         "dockerfile": "Dockerfile",
         "context": "..",
+        "args": {
+            "TORCH_CUDA_EXTRA": "torch-cu130"
+        },
         "options": [
             "--build-arg",
             "BUILDKIT_INLINE_CACHE=1"
@@ -11,11 +14,14 @@
     "runArgs": [
         "--gpus",
         "all",
-        "--shm-size=2g",
+        "--shm-size=4g",
         "--ulimit",
         "memlock=-1",
         "--ulimit",
-        "stack=67108864"
+        "stack=67108864",
+        "--runtime=nvidia",
+        "--security-opt",
+        "no-new-privileges:true"
     ],
     "containerUser": "vscode",
     "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
@@ -27,7 +33,13 @@
         "UV_LINK_MODE": "copy",
         "UV_COMPILE_BYTECODE": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
-        "CUDA_VISIBLE_DEVICES": "all"
+        "CUDA_VISIBLE_DEVICES": "all",
+        // Critical CUDA environment variables
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+        // Fixed CUDA 13.0 paths
+        "LD_LIBRARY_PATH": "/usr/local/cuda-13.0/lib64:${LD_LIBRARY_PATH}",
+        "CUDA_HOME": "/usr/local/cuda-13.0"
     },
     "mounts": [
         {
@@ -54,12 +66,19 @@
             "source": "torch-starter-uv-cache",
             "target": "/home/vscode/.cache/uv",
             "type": "volume"
+        },
+        // Mount .env.local if it exists on host
+        {
+            "source": "${localWorkspaceFolder}/.env.local",
+            "target": "/workspaces/${localWorkspaceFolderBasename}/.env.local",
+            "type": "bind",
+            "consistency": "cached"
         }
     ],
     "initializeCommand": [
         "bash",
         "-c",
-        "docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true"
+        "docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true; touch .env.local 2>/dev/null || true"
     ],
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {
@@ -69,10 +88,13 @@
             "ppa": false,
             "version": "os-provided"
         }
+        // CUDA toolkit included in base image - no additional feature needed
     },
     "postCreateCommand": {
         "activate-env": "bash -c 'source .venv/bin/activate && python -c \"import torch; print(f\\\"🚀 Environment ready! CUDA: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}\\\")\"'",
-        "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}"
+        "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}",
+        // Automatically create .env.local if it doesn't exist
+        "setup-env": "bash -c '[ ! -f .env.local ] && cp templates/env.local .env.local && chmod 600 .env.local && echo \"📝 Created .env.local from template\" || echo \"✓ .env.local already exists\"'"
     },
     "customizations": {
         "vscode": {
@@ -87,7 +109,8 @@
                 "RooVeterinaryInc.roo-cline",
                 "mechatroner.rainbow-csv",
                 "gaogaotiantian.viztracer-vscode",
-                "bierner.markdown-mermaid"
+                "bierner.markdown-mermaid",
+                "github.vscode-github-actions"
             ],
             "settings": {
                 // Python settings
@@ -151,7 +174,7 @@
     },
     "shutdownAction": "stopContainer",
     "hostRequirements": {
-        "gpu": "optional",
+        "gpu": true,
         "memory": "8gb",
         "cpus": 4
     },

@@ -165,6 +165,27 @@ PY
   fi
 }
 
+check_cuda_compatibility() {
+    local pytorch_cuda_version
+    pytorch_cuda_version=$(python -c "import torch; print(torch.version.cuda)" 2>/dev/null || echo "none")
+    
+    if [[ "$pytorch_cuda_version" == "none" ]]; then
+        fail "PyTorch was not compiled with CUDA support"
+        info "Reinstall with: uv sync --extra torch-cu130"
+        return 1
+    fi
+    
+    info "PyTorch CUDA version: $pytorch_cuda_version"
+    
+    # Verify CUDA 13.0 compatibility
+    if [[ "$pytorch_cuda_version" != "13.0" ]]; then
+        warn "PyTorch CUDA version ($pytorch_cuda_version) differs from expected CUDA 13.0"
+        info "This container is optimized for CUDA 13.0"
+    else
+        pass "PyTorch CUDA 13.0 compatibility confirmed"
+    fi
+}
+
 check_pytorch_cuda() {
   local py
   py="$(python_exec)"
@@ -175,6 +196,7 @@ check_pytorch_cuda() {
 import json
 import sys
 import time
+import os
 
 try:
     print("Testing PyTorch import...")
@@ -195,6 +217,28 @@ try:
     print(f"✓ PyTorch v{info['torch_version']} imported in {info['import_time']}s")
     print(f"  CUDA available: {info['cuda_available']}")
     print(f"  CUDA devices: {info['cuda_device_count']}")
+    
+    # Enhanced CUDA diagnostics
+    if not info['cuda_available']:
+        print("\n🔍 CUDA Diagnostics:")
+        
+        # Check CUDA environment variables
+        cuda_vars = ['CUDA_HOME', 'CUDA_PATH', 'LD_LIBRARY_PATH', 'NVIDIA_VISIBLE_DEVICES']
+        for var in cuda_vars:
+            value = os.environ.get(var, 'Not set')
+            print(f"  {var}: {value}")
+        
+        # Check if PyTorch was compiled with CUDA
+        print(f"  PyTorch CUDA version: {info['cuda_version']}")
+        if info['cuda_version'] == "unknown" or info['cuda_version'] is None:
+            print("  ⚠ PyTorch was not compiled with CUDA support")
+            print("  💡 Reinstall PyTorch with CUDA: uv sync --extra torch-cu130")
+        else:
+            print("  ✓ PyTorch was compiled with CUDA support")
+            if info['cuda_version'] != "13.0":
+                print(f"  ⚠ Expected CUDA 13.0, found: {info['cuda_version']}")
+            print("  ⚠ CUDA runtime libraries may be missing or incompatible")
+            print("  💡 Check CUDA runtime installation in container")
     
     if info['cuda_available']:
         print(f"  CUDA version: {info['cuda_version']}")
@@ -218,23 +262,36 @@ try:
             except Exception as e:
                 print(f"  Device {i}: Error getting properties - {e}")
         
-        # Quick CUDA functionality test
+        # Enhanced CUDA functionality test
         try:
             print("\nTesting CUDA functionality...")
             device = torch.device('cuda:0')
+            
+            # Memory allocation test
             x = torch.randn(100, 100, device=device)
             y = torch.randn(100, 100, device=device)
             torch.cuda.synchronize()
             
+            # Computation test
             start_time = time.time()
             z = torch.mm(x, y)
             torch.cuda.synchronize()
             cuda_time = time.time() - start_time
             
-            print(f"✓ CUDA matrix multiplication test: {cuda_time:.4f}s")
+            print(f"✓ CUDA matrix multiplication: {cuda_time:.4f}s")
+            
+            # Memory management test
+            memory_allocated = torch.cuda.memory_allocated(0) / 1024**2  # MB
+            memory_cached = torch.cuda.memory_reserved(0) / 1024**2  # MB
+            print(f"✓ GPU memory - Allocated: {memory_allocated:.1f}MB, Cached: {memory_cached:.1f}MB")
+            
+            # Cleanup
+            del x, y, z
+            torch.cuda.empty_cache()
             
         except Exception as e:
             print(f"✗ CUDA functionality test failed: {e}")
+            print("💡 This may indicate CUDA driver/runtime incompatibility")
     
     # Check additional torch components
     try:
@@ -251,6 +308,7 @@ try:
 
 except ImportError as e:
     print(f"✗ PyTorch import failed: {e}")
+    print("💡 Run: uv sync --extra torch-cu130")
     sys.exit(1)
 except Exception as e:
     print(f"✗ PyTorch verification failed: {e}")
@@ -347,6 +405,22 @@ print_cuda_runtime_info() {
       info "Docker NVIDIA runtime not detected (may be normal)"
     fi
   fi
+  
+  # Check CUDA library paths
+  info "CUDA library path checks:"
+  local cuda_paths=("/usr/local/cuda-13.0/lib64" "/usr/local/cuda/lib64" "/usr/lib/x86_64-linux-gnu")
+  for path in "${cuda_paths[@]}"; do
+    if [[ -d "$path" ]]; then
+      local cuda_libs=$(find "$path" -name "libcuda*" 2>/dev/null | wc -l)
+      if [[ "$cuda_libs" -gt 0 ]]; then
+        pass "CUDA libraries found in: $path ($cuda_libs files)"
+      else
+        info "Directory exists but no CUDA libraries: $path"
+      fi
+    else
+      info "CUDA path not found: $path"
+    fi
+  done
 }
 
 check_performance() {
@@ -413,12 +487,13 @@ def benchmark_torch_gpu():
             
         device = torch.device('cuda:0')
         
-        # Warm up
-        a = torch.randn(100, 100, device=device)
-        b = torch.randn(100, 100, device=device)
-        torch.cuda.synchronize()
-        _ = torch.mm(a, b)
-        torch.cuda.synchronize()
+        # Warm up GPU
+        for _ in range(3):
+            a = torch.randn(100, 100, device=device)
+            b = torch.randn(100, 100, device=device)
+            torch.cuda.synchronize()
+            _ = torch.mm(a, b)
+            torch.cuda.synchronize()
         
         # Actual benchmark
         a = torch.randn(1000, 1000, device=device)
@@ -431,6 +506,10 @@ def benchmark_torch_gpu():
         duration = time.time() - start
         
         print(f"PyTorch GPU matrix multiply (1000x1000): {duration:.3f}s")
+        
+        # Cleanup
+        del a, b, c
+        torch.cuda.empty_cache()
         
         return duration
     except Exception as e:
@@ -456,6 +535,10 @@ if numpy_time and python_time:
 if torch_cpu_time and torch_gpu_time:
     speedup = torch_cpu_time / torch_gpu_time
     print(f"GPU speedup over CPU: {speedup:.1f}x")
+    if speedup < 2:
+        print("  ⚠ GPU speedup is low - check GPU utilization")
+    elif speedup > 50:
+        print("  🚀 Excellent GPU acceleration!")
 
 if torch_cpu_time and numpy_time:
     ratio = torch_cpu_time / numpy_time
@@ -482,6 +565,10 @@ check_environment_config() {
     "HF_HOME:Hugging Face cache"
     "TORCH_HOME:PyTorch cache"
     "CUDA_VISIBLE_DEVICES:CUDA device visibility"
+    "NVIDIA_VISIBLE_DEVICES:NVIDIA device visibility"
+    "NVIDIA_DRIVER_CAPABILITIES:NVIDIA driver capabilities"
+    "LD_LIBRARY_PATH:Library search path"
+    "CUDA_HOME:CUDA 13.0 installation path"
   )
   
   for var_desc in "${env_vars[@]}"; do
@@ -501,9 +588,50 @@ check_environment_config() {
     local key_count
     key_count=$(grep -c "^[A-Z].*=" ".env.local" 2>/dev/null || echo "0")
     pass ".env.local found with $key_count environment variables"
+    
+    # Check file permissions
+    local perms
+    perms=$(stat -c "%a" ".env.local" 2>/dev/null || echo "unknown")
+    if [[ "$perms" == "600" ]]; then
+      pass ".env.local has secure permissions (600)"
+    else
+      warn ".env.local permissions: $perms (should be 600)"
+      info "Fix with: chmod 600 .env.local"
+    fi
   else
     info ".env.local not found (API keys not configured)"
     info "Run './dev.sh setup-keys' to configure API keys"
+  fi
+}
+
+check_container_health() {
+  section "Container Health"
+  
+  # Check available resources
+  if command -v free >/dev/null 2>&1; then
+    local memory_info
+    memory_info=$(free -h | grep "Mem:")
+    info "Memory: $memory_info"
+  fi
+  
+  if command -v df >/dev/null 2>&1; then
+    local disk_usage
+    disk_usage=$(df -h /workspaces 2>/dev/null | tail -n 1 || echo "N/A")
+    info "Workspace disk usage: $disk_usage"
+  fi
+  
+  # Check network connectivity
+  if ping -c 1 8.8.8.8 >/dev/null 2>&1; then
+    pass "Network connectivity OK"
+  else
+    warn "Network connectivity issues detected"
+  fi
+  
+  # Check if running in container
+  if [[ -f "/.dockerenv" ]] || grep -q "docker\|lxc" /proc/1/cgroup 2>/dev/null; then
+    pass "Running in container environment"
+  else
+    info "Not running in container (native environment)"
   fi
 }
 
@@ -513,6 +641,7 @@ summary() {
   echo "=" * 50
   
   local issues_found=false
+  local warnings_found=false
   
   # Check if major components are working
   if ! command -v python >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
@@ -525,20 +654,46 @@ summary() {
     issues_found=true
   fi
   
+  # Check CUDA availability
+  local cuda_available
+  cuda_available=$(python_exec -c "import torch; print(torch.cuda.is_available())" 2>/dev/null || echo "false")
+  
+  if [[ "$cuda_available" == "False" ]]; then
+    warn "CUDA not available in PyTorch"
+    warnings_found=true
+    echo
+    color "1;33" "🔧 CUDA Troubleshooting:"
+    echo "1. Ensure GPU passthrough: Check Docker Desktop GPU settings"
+    echo "2. Verify NVIDIA runtime: docker info | grep nvidia"
+    echo "3. Rebuild container with CUDA runtime libraries"
+    echo "4. Check CUDA compatibility: nvidia-smi vs PyTorch CUDA version"
+  fi
+  
   if [[ "$issues_found" == "true" ]]; then
     echo
-    color "1;31" "⚠️  Issues Found - Troubleshooting Steps:"
+    color "1;31" "⚠️  Critical Issues Found - Troubleshooting Steps:"
     echo "1. Ensure virtual environment is activated: source .venv/bin/activate"
     echo "2. Sync dependencies: ./dev.sh sync"
-    echo "3. If CUDA issues: check GPU passthrough and rebuild container"
-    echo "4. For import errors: clear caches with ./dev.sh clean"
+    echo "3. If import errors: clear caches with ./dev.sh clean"
+    echo "4. Rebuild container: Ctrl+Shift+P → 'Dev Container: Rebuild Container'"
     return 1
+  elif [[ "$warnings_found" == "true" ]]; then
+    echo
+    color "1;33" "⚠️  Warnings Found - Environment Partially Ready"
+    echo
+    echo "Your environment is functional but has some issues:"
+    echo "  • Basic development capabilities available"
+    echo "  • CPU-based ML/DL training supported"
+    echo "  • GPU acceleration not available"
+    echo
+    echo "For GPU support, address the CUDA issues above."
+    return 0
   else
     echo
     color "1;32" "✅ Environment verification completed successfully!"
     echo
     echo "Your development environment is ready for:"
-    echo "  • Deep learning with PyTorch"
+    echo "  • Deep learning with PyTorch${cuda_available:+ (GPU accelerated)}"
     echo "  • Machine learning with transformers"
     echo "  • Data science with NumPy/Pandas"
     echo "  • Interactive development with Jupyter"
@@ -555,7 +710,7 @@ main() {
   local start_time
   start_time=$(date +%s)
   
-  color "1;36" "🔍 Environment Verification Script"
+  color "1;36" "🔍 Enhanced Environment Verification"
   color "1;36" "=================================="
   
   section "System Tools"
@@ -575,13 +730,15 @@ main() {
     exit 1
   fi
   
-  # Continue with other checks
+  # Continue with other checks (don't exit on warnings)
   check_imports_and_versions || warn "Package verification had issues"
   check_pytorch_cuda || warn "PyTorch/CUDA verification had issues"
+  check_cuda_compatibility || warn "CUDA compatibility check had issues"
   check_caches_rw
   print_cuda_runtime_info
   check_performance
   check_environment_config
+  check_container_health
   
   local end_time
   end_time=$(date +%s)

@@ -1,7 +1,7 @@
 [project]
 name = "torch-starter"
 version = "0.1.0"
-description = "Optimized Deep Learning starter template with uv, CUDA 12.4 PyTorch, and VS Code Dev Containers."
+description = "Optimized Deep Learning starter template with uv, CUDA 13.0 PyTorch, and VS Code Dev Containers."
 requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }
 authors = [{ name = "Your Name" }]
@@ -48,11 +48,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# PyTorch with CUDA - separate for flexibility
+# PyTorch with CUDA 13.0 support
 torch-cu130 = [
-  "torch>=2.0,<3.0",
-  "torchvision>=0.15,<1.0",
-  "torchaudio>=2.0,<3.0"
+    "torch>=2.0.0+cu130",
+    "torchvision>=0.15.0+cu130",
+    "torchaudio>=2.0.0+cu130"
 ]
 
 # Development tools - minimal set
@@ -247,6 +247,7 @@ index-strategy = "unsafe-best-match"
 resolution = "highest"
 compile-bytecode = true
 link-mode = "copy"
+concurrent-downloads = 10
 
 # Primary index: PyPI (default)
 [[tool.uv.index]]
@@ -259,8 +260,12 @@ name = "pypi"
 url = "https://pypi.org/simple"
 default = true
 
-# Secondary index: PyTorch CUDA wheels
-
+# Secondary index: PyTorch CUDA 13.0 wheels
 [[tool.uv.index]]
-name = "pytorch"
+name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
+
+# PyTorch CPU-only index (for compatibility)
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"

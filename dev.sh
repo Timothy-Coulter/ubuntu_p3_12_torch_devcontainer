@@ -61,6 +61,79 @@ ensure_uv_and_python() {
     exit 1
   }
   log_success "Environment setup complete"
+ 
+# CUDA version management
+get_cuda_version() {
+  if [[ -n "${CUDA_VERSION:-}" ]]; then
+    echo "${CUDA_VERSION}"
+  elif [[ -f ".devcontainer/devcontainer.json" ]]; then
+    # Extract CUDA version from devcontainer.json
+    python3 -c "
+import json
+try:
+    with open('.devcontainer/devcontainer.json') as f:
+        config = json.load(f)
+        cuda_version = config.get('containerEnv', {}).get('CUDA_VERSION', '12.4')
+        print(cuda_version)
+except:
+    print('12.4')
+" 2>/dev/null || echo "12.4"
+  else
+    echo "12.4"
+  fi
+}
+
+set_cuda_version() {
+  local version="${1:-12.4}"
+  local devcontainer_file=".devcontainer/devcontainer.json"
+  
+  if [[ ! -f "$devcontainer_file" ]]; then
+    log_error "Dev container configuration not found"
+    return 1
+  fi
+  
+  # Update containerEnv.CUDA_VERSION
+  python3 -c "
+import json
+import sys
+
+try:
+    with open('$devcontainer_file', 'r') as f:
+        config = json.load(f)
+    
+    if 'containerEnv' not in config:
+        config['containerEnv'] = {}
+    
+    config['containerEnv']['CUDA_VERSION'] = '$version'
+    
+    # Update NVIDIA feature cudaVersion
+    if 'features' in config:
+        for feature_name, feature_config in config['features'].items():
+            if 'nvidia-cuda' in feature_name:
+                feature_config['cudaVersion'] = '\${containerEnv:CUDA_VERSION}'
+    
+    # Update build args
+    if 'build' not in config:
+        config['build'] = {}
+    if 'args' not in config['build']:
+        config['build']['args'] = {}
+    config['build']['args']['CUDA_VERSION'] = '\${containerEnv:CUDA_VERSION}'
+    
+    with open('$devcontainer_file', 'w') as f:
+        json.dump(config, f, indent=4)
+    
+    print(f'Updated CUDA version to {version}')
+except Exception as e:
+    print(f'Error updating CUDA version: {e}', file=sys.stderr)
+    sys.exit(1)
+" || {
+    log_error "Failed to update CUDA version in devcontainer.json"
+    return 1
+  }
+  
+  log_success "CUDA version set to $version"
+  log_info "Rebuild container to apply changes: Ctrl+Shift+P → 'Dev Container: Rebuild Container'"
+}
 }
 
 # Performance-optimized commands with better error handling
@@ -183,6 +256,17 @@ cmd_lock_update() {
     return 1
   }
   log_success "Dependencies updated and synced"
+}
+
+# In dev.sh
+cmd_validate_lock() {
+    if uv lock --check 2>/dev/null; then
+        log_success "Lock file is up to date"
+    else
+        log_warning "Lock file is outdated"
+        log_info "Run './dev.sh lock-update' to update"
+        return 1
+    fi
 }
 
 cmd_clean() {
@@ -561,6 +645,15 @@ cmd_security() {
   log_success "Security scan completed"
 }
 
+cmd_select_gpu() {
+    if [[ $(nvidia-smi -L | wc -l) -gt 1 ]]; then
+        echo "Available GPUs:"
+        nvidia-smi -L
+        read -p "Select GPU (0-N, or 'all'): " gpu_selection
+        export CUDA_VISIBLE_DEVICES="$gpu_selection"
+    fi
+}
+
 # Benchmarking
 cmd_benchmark() {
   log_info "Running environment benchmark..."
@@ -631,6 +724,9 @@ ENVIRONMENT:
   optimize           Run environment optimizations
   verify-setup       Verify environment and dependencies
   setup-keys         Setup API keys interactively
+  cuda-version       Show current CUDA version
+  set-cuda <version> Set CUDA version (requires rebuild)
+  list-cuda          List supported CUDA versions
   clean              Remove caches and build artifacts
 
 CODE QUALITY:
@@ -685,11 +781,11 @@ USAGE
 
 # Performance timer wrapper
 time_command() {
-  local cmd="$1"
+  local func_name="$1"
   local start_time=$(date +%s.%N 2>/dev/null || date +%s)
   
   shift
-  "$cmd" "$@"
+  "$func_name" "$@"
   local exit_code=$?
   
   local end_time=$(date +%s.%N 2>/dev/null || date +%s)
@@ -715,7 +811,7 @@ main() {
   
   # Validate command exists
   case "$cmd" in
-    sync|sync-minimal|format|lint|lint-fix|fix-imports|typecheck|test|test-cov|all-checks|lock-update|clean|verify-setup|setup-keys|add-temp|add-perm|remove|rebuild-image|sync-temp|profile|memory-profile|jupyter|notebook|docker-stats|docker-cleanup|optimize|install-hooks|run-hooks|deps-tree|deps-outdated|security|benchmark|""|help|-h|--help)
+    sync|sync-minimal|format|lint|lint-fix|fix-imports|typecheck|test|test-cov|all-checks|lock-update|validate-lock|clean|verify-setup|setup-keys|add-temp|add-perm|remove|rebuild-image|sync-temp|profile|memory-profile|jupyter|notebook|docker-stats|docker-cleanup|optimize|install-hooks|run-hooks|deps-tree|deps-outdated|security|benchmark|cuda-version|set-cuda|list-cuda|lock-update|""|help|-h|--help)
       # Valid command, continue
       ;;
     *)
@@ -729,7 +825,9 @@ main() {
   # Add timing to long-running commands
   case "$cmd" in
     sync|all-checks|test|typecheck|lock-update|benchmark)
-      time_command "cmd_$cmd" "${@:2}"
+      # Replace dashes with underscores in function names
+      local func_name="cmd_${cmd//-/_}"
+      time_command "$func_name" "${@:2}"
       ;;
     sync-minimal) cmd_sync_minimal ;;
     format) cmd_format ;;
@@ -742,6 +840,7 @@ main() {
     all-checks) cmd_all_checks ;;
     lock-update) cmd_lock_update ;;
     clean) cmd_clean ;;
+    validate-lock) cmd_validate_lock ;;
     verify-setup) cmd_verify_setup ;;
     setup-keys) cmd_setup_keys ;;
     add-temp) cmd_add_temp "${2:-}" ;;
@@ -762,6 +861,9 @@ main() {
     deps-outdated) cmd_deps_outdated ;;
     security) cmd_security ;;
     benchmark) cmd_benchmark ;;
+    cuda-version) cmd_cuda_version ;;
+    set-cuda) cmd_set_cuda "${2:-}" ;;
+    list-cuda) cmd_list_cuda ;;
     ""|help|-h|--help) usage ;;
   esac
 }

@@ -1,16 +1,16 @@
 # syntax=docker/dockerfile:1.7
 
 # Multi-stage build for better caching and smaller final image
-FROM mcr.microsoft.com/vscode/devcontainers/base:ubuntu-24.04 AS base-deps
+# Using NVIDIA CUDA 13.0 base image with cuDNN runtime pre-installed
+FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04 AS base-deps
 
 # Build arguments for cache control
 ARG BUILDKIT_INLINE_CACHE=1
 ARG PYTHON_VERSION=3.12
-ARG CUDA_VERSION=13.0
+ARG TORCH_CUDA_EXTRA=torch-cu130
 
 # Environment setup - consolidated for better layer caching
 ENV DEBIAN_FRONTEND=noninteractive \
-    CUDA_VERSION=${CUDA_VERSION} \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
@@ -22,6 +22,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=C.UTF-8
 
 # System dependencies - optimized layer with cleanup
+# CUDA runtime libraries already included in base image
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -32,11 +33,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     # SSH and process management
     openssh-client tini \
     # Performance tools
-    htop iotop \
-    bc \
+    htop iotop bc \
+    # Additional utilities
+    zsh sudo \
     # Cleanup in same layer
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install --system
+
+# Set CUDA environment variables for CUDA 13.0
+ENV CUDA_HOME=/usr/local/cuda-13.0 \
+    PATH=/usr/local/cuda-13.0/bin:${PATH} \
+    LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:${LD_LIBRARY_PATH} \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Install uv
 RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
@@ -87,7 +96,8 @@ RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
     --index-strategy unsafe-best-match \
     --extra dev \
     --extra notebook \
-    --extra torch-cu130 \
+    --extra ${TORCH_CUDA_EXTRA} \
+    --index pytorch-cu130 \
     --compile-bytecode \
     && echo "External dependencies installed"
 
@@ -105,19 +115,21 @@ RUN . .venv/bin/activate \
     --display-name "Python ${PYTHON_VERSION} (torch_starter)" \
     && echo "Project setup completed"
 
-# Quick validation (non-blocking)
+# Enhanced validation with CUDA test
 RUN . .venv/bin/activate \
     && python -c "import sys; print(f'Python {sys.version}')" \
     && python -c "import torch; print(f'PyTorch {torch.__version__}')" \
     && python -c "import transformers; print(f'Transformers {transformers.__version__}')" \
-    || echo "Warning: Some packages may not be available"
+    && python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')" \
+    && python -c "import torch; print(f'CUDA devices: {torch.cuda.device_count()}')" \
+    || echo "Warning: Some packages may not be available or CUDA setup incomplete"
 
 # Runtime configuration
 EXPOSE 8888 8000 6006
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import torch" || exit 1
+# Enhanced health check with CUDA
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'" || exit 1
 
 # Optimized entrypoint
 ENTRYPOINT ["/usr/bin/tini", "--"]
@@ -125,5 +137,5 @@ CMD ["/bin/bash", "-l"]
 
 # Labels for better organization
 LABEL org.opencontainers.image.title="torch_starter"
-LABEL org.opencontainers.image.description="Optimized PyTorch development environment"
-LABEL org.opencontainers.image.version="2.0-optimized"
+LABEL org.opencontainers.image.description="Optimized PyTorch development environment with CUDA support"
+LABEL org.opencontainers.image.version="2.1-cuda-fixed"
