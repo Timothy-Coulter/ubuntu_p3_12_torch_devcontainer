@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
 # Multi-stage build for better caching and smaller final image
-# Using NVIDIA CUDA 13.0 base image with cuDNN runtime pre-installed
-FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04 AS base-deps
+# Using NVIDIA CUDA 12.6 base image with cuDNN runtime pre-installed
+FROM nvidia/cuda:12.6.0-cudnn-runtime-ubuntu24.04 AS base-deps
 
 # Build arguments for cache control
 ARG BUILDKIT_INLINE_CACHE=1
 ARG PYTHON_VERSION=3.12
-ARG TORCH_CUDA_EXTRA=torch-cu130
+ARG TORCH_CUDA_EXTRA=torch-cu126
 
 # Environment setup - consolidated for better layer caching
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -40,17 +40,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install --system
 
-# Set CUDA environment variables for CUDA 13.0
-ENV CUDA_HOME=/usr/local/cuda-13.0 \
-    PATH=/usr/local/cuda-13.0/bin:${PATH} \
-    LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:${LD_LIBRARY_PATH} \
+# Set CUDA environment variables for CUDA 12.6
+ENV CUDA_HOME=/usr/local/cuda-12.6 \
+    PATH=/usr/local/cuda-12.6/bin:${PATH} \
+    LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:${LD_LIBRARY_PATH} \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Install uv
-RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
-    curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && uv --version
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && /root/.cargo/bin/uv --version
+
+# Add uv to PATH
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # User setup
 ARG APP_USER=vscode
@@ -63,11 +65,17 @@ RUN mkdir -p \
     ${HOME}/.cache/uv \
     ${HOME}/.kaggle \
     /workspaces/data \
-    && chown -R ${APP_USER}:${APP_USER} ${HOME} /workspaces
+    && useradd -m -s /bin/zsh -u 1000 ${APP_USER} \
+    && chown -R ${APP_USER}:${APP_USER} ${HOME} /workspaces \
+    && usermod -aG sudo ${APP_USER} \
+    && echo "${APP_USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Switch to user early
 USER ${APP_USER}
 WORKDIR /workspaces
+
+# Ensure uv is available for the user
+ENV PATH="/home/${APP_USER}/.cargo/bin:${PATH}"
 
 # Python environment setup stage
 FROM base-deps AS python-env
@@ -75,7 +83,7 @@ FROM base-deps AS python-env
 # UV configuration for performance
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
-    UV_PYTHON_DOWNLOADS=manual
+    UV_PYTHON_DOWNLOADS=automatic
 
 # Install Python with cache
 RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
@@ -97,7 +105,6 @@ RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
     --extra dev \
     --extra notebook \
     --extra ${TORCH_CUDA_EXTRA} \
-    --index pytorch-cu130 \
     --compile-bytecode \
     && echo "External dependencies installed"
 
@@ -129,7 +136,7 @@ EXPOSE 8888 8000 6006
 
 # Enhanced health check with CUDA
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'" || exit 1
+    CMD /bin/bash -c "source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available(), \"CUDA not available\"'" || exit 1
 
 # Optimized entrypoint
 ENTRYPOINT ["/usr/bin/tini", "--"]
@@ -137,5 +144,5 @@ CMD ["/bin/bash", "-l"]
 
 # Labels for better organization
 LABEL org.opencontainers.image.title="torch_starter"
-LABEL org.opencontainers.image.description="Optimized PyTorch development environment with CUDA support"
-LABEL org.opencontainers.image.version="2.1-cuda-fixed"
+LABEL org.opencontainers.image.description="Optimized PyTorch development environment with CUDA 12.6 support"
+LABEL org.opencontainers.image.version="2.2-cuda126-optimized"

@@ -1,7 +1,7 @@
 [project]
 name = "torch-starter"
 version = "0.1.0"
-description = "Optimized Deep Learning starter template with uv, CUDA 13.0 PyTorch, and VS Code Dev Containers."
+description = "Optimized Deep Learning starter template with uv, CUDA 12.6 PyTorch, and VS Code Dev Containers."
 requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }
 authors = [{ name = "Your Name" }]
@@ -16,20 +16,20 @@ dependencies = [
   "safetensors>=0.4,<1.0",
   "torchvision>=0.21.0",
   "torchaudio>=2.6.0",
-  "albumentations>=2.0.8",
+  "albumentations>=1.3.1,<2.0",
   # Core scientific computing
   "numpy>=1.26,<2.0",
   "pandas>=2.0,<3.0",
   "scipy>=1.11,<2.0",
   # Machine learning essentials
   "scikit-learn>=1.3,<2.0",
-  "tqdm"
+  "tqdm>=4.66.0",
   # Tokenization
-  "sentencepiece",
+  "sentencepiece>=0.1.99",
   # Visualization (minimal)
-  "matplotlib",
-  "plotly",
-  "seaborn",
+  "matplotlib>=3.7.0",
+  "plotly>=5.0.0",
+  "seaborn>=0.12.0",
   # Jupyter minimal
   "jupyter>=1.0,<2.0",
   "ipykernel>=6.29,<7.0",
@@ -39,63 +39,73 @@ dependencies = [
   "viztracer>=0.17.1",
   # Environment management
   "python-dotenv>=1.0,<2.0",
-  
 ]
 
+[project.optional-dependencies]
 # Development tools - minimal set
 dev = [
-  "ruff",
-  "mypy",
-  "pydantic",
-  "pytest",
-  "pytest-cov",
-  "types-requests",
-  "types-PyYAML",
-  "pre-commit",
-  "memory-profiler",
-  "safety",
-  "ruff",
-  "mypy",
-  "pytest",
-  "pytest-cov",
+  "ruff>=0.5.0",
+  "mypy>=1.10.0",
+  "pydantic>=2.8.0",
+  "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
+  "types-requests>=2.32.0",
+  "types-PyYAML>=6.0.12",
+  "pre-commit>=3.7.0",
+  "memory-profiler>=0.61.0",
+  "safety>=3.2.0",
 ]
 
 # Extended data science tools (optional)
 datascience = [
   "seaborn>=0.13,<1.0",
   "plotly>=5.0,<6.0",
-  "scikit-image>=0.25.0,<1.0",
-  "pywavelets>=1.9.0,<2.0",
+  "scikit-image>=0.24.0,<1.0",
+  "pywavelets>=1.4.0,<2.0",
 ]
 
 # Notebook and lab tools (optional)
 notebook = [
-  "jupyterlab",
-  "ipdb",
-  "notebook",
+  "jupyterlab>=4.2.0",
+  "ipdb>=0.13.13",
+  "notebook>=7.2.0",
 ]
 
 # Experiment tracking (optional)
 tracking = [
-  "tensorboard",
-  "wandb",
+  "tensorboard>=2.16.0",
+  "wandb>=0.17.0",
 ]
 
 # Data acquisition (optional)
 data = [
-  "kaggle",
+  "kaggle>=1.6.0",
 ]
 
 # Profiling tools (optional) 
 profiling = [
-  "viztracer",
-  "memory-profiler",
+  "viztracer>=0.17.1",
+  "memory-profiler>=0.61.0",
 ]
 
 # Security scanning (optional)
 security = [
-  "safety",
-  "bandit",
+  "safety>=3.2.0",
+  "bandit>=1.7.5",
+]
+
+# CUDA 12.6 specific PyTorch
+torch-cu126 = [
+  "torch>=2.5.0",
+  "torchvision>=0.21.0", 
+  "torchaudio>=2.6.0",
+]
+
+# CPU-only PyTorch (for compatibility)
+torch-cpu = [
+  "torch>=2.5.0+cpu",
+  "torchvision>=0.21.0+cpu",
+  "torchaudio>=2.6.0+cpu",
 ]
 
 [build-system]
@@ -193,7 +203,9 @@ module = [
     "plotly.*",
     "sklearn.*",
     "viztracer.*",
-    "memory_profiler.*"
+    "memory_profiler.*",
+    "albumentations.*",
+    "sentencepiece.*"
 ]
 ignore_missing_imports = true
 
@@ -242,10 +254,14 @@ compile-bytecode = true
 link-mode = "copy"
 concurrent-downloads = 10
 
+# PyTorch CUDA 12.6 index
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
 # Primary index: PyPI (default)
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
 default = true
-
-

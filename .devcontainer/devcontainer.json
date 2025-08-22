@@ -1,10 +1,10 @@
 {
-    "name": "torch_starter-optimized (CUDA 13.0, uv, Py3.12)",
+    "name": "torch_starter-optimized (CUDA 12.6, uv, Py3.12)",
     "build": {
         "dockerfile": "Dockerfile",
         "context": "..",
         "args": {
-            "TORCH_CUDA_EXTRA": "torch-cu130"
+            "TORCH_CUDA_EXTRA": "torch-cu126"
         },
         "options": [
             "--build-arg",
@@ -14,7 +14,7 @@
     "runArgs": [
         "--gpus",
         "all",
-        "--shm-size=4g",
+        "--shm-size=8g",
         "--ulimit",
         "memlock=-1",
         "--ulimit",
@@ -34,12 +34,11 @@
         "UV_COMPILE_BYTECODE": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
         "CUDA_VISIBLE_DEVICES": "all",
-        // Critical CUDA environment variables
         "NVIDIA_VISIBLE_DEVICES": "all",
         "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
-        // Fixed CUDA 13.0 paths
-        "LD_LIBRARY_PATH": "/usr/local/cuda-13.0/lib64:${LD_LIBRARY_PATH}",
-        "CUDA_HOME": "/usr/local/cuda-13.0"
+        "LD_LIBRARY_PATH": "/usr/local/cuda-12.6/lib64:${LD_LIBRARY_PATH}",
+        "CUDA_HOME": "/usr/local/cuda-12.6",
+        "PATH": "/home/vscode/.cargo/bin:${PATH}"
     },
     "mounts": [
         {
@@ -67,7 +66,6 @@
             "target": "/home/vscode/.cache/uv",
             "type": "volume"
         },
-        // Mount .env.local if it exists on host
         {
             "source": "${localWorkspaceFolder}/.env.local",
             "target": "/workspaces/${localWorkspaceFolderBasename}/.env.local",
@@ -88,12 +86,10 @@
             "ppa": false,
             "version": "os-provided"
         }
-        // CUDA toolkit included in base image - no additional feature needed
     },
     "postCreateCommand": {
         "activate-env": "bash -c 'source .venv/bin/activate && python -c \"import torch; print(f\\\"🚀 Environment ready! CUDA: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}\\\")\"'",
         "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}",
-        // Automatically create .env.local if it doesn't exist
         "setup-env": "bash -c '[ ! -f .env.local ] && cp templates/env.local .env.local && chmod 600 .env.local && echo \"📝 Created .env.local from template\" || echo \"✓ .env.local already exists\"'"
     },
     "customizations": {
@@ -113,25 +109,21 @@
                 "github.vscode-github-actions"
             ],
             "settings": {
-                // Python settings
                 "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python",
                 "python.terminal.activateEnvironment": true,
                 "python.analysis.typeCheckingMode": "basic",
                 "python.analysis.autoImportCompletions": true,
                 "python.analysis.indexing": true,
-                // Testing
                 "python.testing.pytestEnabled": true,
                 "python.testing.unittestEnabled": false,
                 "python.testing.pytestArgs": [
                     "tests"
                 ],
-                // Ruff configuration  
                 "ruff.enable": true,
                 "ruff.organizeImports": true,
                 "ruff.serverEnabled": true,
                 "ruff.lint.enable": true,
                 "ruff.format.enable": true,
-                // Editor performance
                 "files.watcherExclude": {
                     "**/.venv/**": true,
                     "**/__pycache__/**": true,
@@ -153,16 +145,12 @@
                     "**/.ruff_cache": true,
                     "**/.pytest_cache": true
                 },
-                // Terminal settings
                 "terminal.integrated.defaultProfile.linux": "zsh",
                 "terminal.integrated.shellIntegration.enabled": true,
-                // Jupyter settings
                 "jupyter.askForKernelRestart": false,
                 "notebook.experimental.openGettingStarted": false,
-                // Git settings
                 "git.enableSmartCommit": true,
                 "git.autofetch": true,
-                // Performance settings
                 "extensions.autoUpdate": false,
                 "telemetry.telemetryLevel": "off"
             }
