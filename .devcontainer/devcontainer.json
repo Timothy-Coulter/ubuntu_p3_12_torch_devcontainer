@@ -1,12 +1,21 @@
 {
-    "name": "torch_starter (CUDA 12.4, uv, Py3.12)",
+    "name": "torch_starter-optimized (CUDA 12.4, uv, Py3.12)",
     "build": {
         "dockerfile": "Dockerfile",
-        "context": ".."
+        "context": "..",
+        "options": [
+            "--build-arg",
+            "BUILDKIT_INLINE_CACHE=1"
+        ]
     },
     "runArgs": [
         "--gpus",
-        "all"
+        "all",
+        "--shm-size=2g",
+        "--ulimit",
+        "memlock=-1",
+        "--ulimit",
+        "stack=67108864"
     ],
     "containerUser": "vscode",
     "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
@@ -15,66 +24,142 @@
         "TRANSFORMERS_CACHE": "/home/vscode/.cache/huggingface",
         "TORCH_HOME": "/home/vscode/.cache/torch",
         "KAGGLE_CONFIG_DIR": "/home/vscode/.kaggle",
-        "UV_LINK_MODE": "copy"
+        "UV_LINK_MODE": "copy",
+        "UV_COMPILE_BYTECODE": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "CUDA_VISIBLE_DEVICES": "all"
     },
     "mounts": [
-        "source=${localEnv:USERPROFILE}/.cache/huggingface,target=/home/vscode/.cache/huggingface,type=bind,consistency=cached",
-        "source=${localEnv:USERPROFILE}/.cache/torch,target=/home/vscode/.cache/torch,type=bind,consistency=cached",
-        "source=${localEnv:USERPROFILE}/.kaggle,target=/home/vscode/.kaggle,type=bind,consistency=cached",
-        "source=${localEnv:USERPROFILE}/data,target=${containerWorkspaceFolder}/data,type=bind,consistency=cached"
+        {
+            "source": "torch-starter-hf-cache",
+            "target": "/home/vscode/.cache/huggingface",
+            "type": "volume"
+        },
+        {
+            "source": "torch-starter-torch-cache",
+            "target": "/home/vscode/.cache/torch",
+            "type": "volume"
+        },
+        {
+            "source": "torch-starter-kaggle-cache",
+            "target": "/home/vscode/.kaggle",
+            "type": "volume"
+        },
+        {
+            "source": "torch-starter-data",
+            "target": "/workspaces/${localWorkspaceFolderBasename}/data",
+            "type": "volume"
+        },
+        {
+            "source": "torch-starter-uv-cache",
+            "target": "/home/vscode/.cache/uv",
+            "type": "volume"
+        }
     ],
-    "initializeCommand": "powershell -NoProfile -Command \"$u=$env:USERPROFILE; if (-not [string]::IsNullOrEmpty($u)) { New-Item -ItemType Directory -Force -Path $u+'\\\\.cache\\\\huggingface',$u+'\\\\.cache\\\\torch',$u+'\\\\.kaggle',$u+'\\\\data' | Out-Null }\"",
-    "features": {},
-    "postCreateCommand": "bash -lc \"source .venv/bin/activate && python -c 'import torch; print(f\\\"🚀 Environment ready! CUDA available: {torch.cuda.is_available()}\\\")' && echo '✅ Container startup completed in seconds instead of minutes!'\"",
+    "initializeCommand": [
+        "bash",
+        "-c",
+        "docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true"
+    ],
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "configureZshAsDefaultShell": true
+        },
+        "ghcr.io/devcontainers/features/git:1": {
+            "ppa": false,
+            "version": "os-provided"
+        }
+    },
+    "postCreateCommand": {
+        "activate-env": "bash -c 'source .venv/bin/activate && python -c \"import torch; print(f\\\"🚀 Environment ready! CUDA: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}\\\")\"'",
+        "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}"
+    },
     "customizations": {
         "vscode": {
             "extensions": [
+                // Core Python (essential)
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ms-toolsai.jupyter",
-                "ms-azuretools.vscode-docker",
-                "ms-vscode.makefile-tools",
-                "redhat.vscode-yaml",
+                // Code quality (essential)
+                "charliermarsh.ruff",
+                // Development tools (useful)
                 "eamodio.gitlens",
                 "EditorConfig.EditorConfig",
-                "charliermarsh.ruff",
-                "RooVeterinaryInc.roo-cline",
-                "gaogaotiantian.viztracer-vscode"
+                // Optional - remove if not needed
+                "ms-azuretools.vscode-docker",
+                "redhat.vscode-yaml"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+                // Python settings
+                "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python",
                 "python.terminal.activateEnvironment": true,
+                "python.analysis.typeCheckingMode": "basic",
+                "python.analysis.autoImportCompletions": true,
+                "python.analysis.indexing": true,
+                // Testing
                 "python.testing.pytestEnabled": true,
                 "python.testing.unittestEnabled": false,
                 "python.testing.pytestArgs": [
                     "tests"
                 ],
+                // Ruff configuration  
                 "ruff.enable": true,
                 "ruff.organizeImports": true,
                 "ruff.serverEnabled": true,
-                "ruff.serverPath": "ruff",
-                "mypy.args": [
-                    "--config-file",
-                    "${workspaceFolder}/pyproject.toml"
-                ],
-                "terminal.integrated.shellIntegration.enabled": true,
-                "files.exclude": {
+                "ruff.lint.enable": true,
+                "ruff.format.enable": true,
+                // Editor performance
+                "files.watcherExclude": {
+                    "**/.venv/**": true,
+                    "**/__pycache__/**": true,
+                    "**/.mypy_cache/**": true,
+                    "**/.ruff_cache/**": true,
+                    "**/.pytest_cache/**": true,
+                    "**/node_modules/**": true
+                },
+                "search.exclude": {
                     "**/.venv": true,
+                    "**/__pycache__": true,
+                    "**/.mypy_cache": true,
+                    "**/.ruff_cache": true
+                },
+                "files.exclude": {
+                    "**/.venv": false,
                     "**/__pycache__": true,
                     "**/.mypy_cache": true,
                     "**/.ruff_cache": true,
                     "**/.pytest_cache": true
                 },
-                "notebook.experimental.openGettingStarted": false
+                // Terminal settings
+                "terminal.integrated.defaultProfile.linux": "zsh",
+                "terminal.integrated.shellIntegration.enabled": true,
+                // Jupyter settings
+                "jupyter.askForKernelRestart": false,
+                "notebook.experimental.openGettingStarted": false,
+                // Git settings
+                "git.enableSmartCommit": true,
+                "git.autofetch": true,
+                // Performance settings
+                "extensions.autoUpdate": false,
+                "telemetry.telemetryLevel": "off"
             }
         }
     },
     "remoteEnv": {
-        "ROO_CONFIG_PATH": "${containerWorkspaceFolder}/.roo/roo.json",
-        "MCP_SERVERS_CONFIG": "${containerWorkspaceFolder}/.mcp/servers.json"
+        "ROO_CONFIG_PATH": "/workspaces/${localWorkspaceFolderBasename}/.roo/roo.json",
+        "MCP_SERVERS_CONFIG": "/workspaces/${localWorkspaceFolderBasename}/.mcp/servers.json"
     },
     "shutdownAction": "stopContainer",
     "hostRequirements": {
-        "gpu": "optional"
-    }
+        "gpu": "optional",
+        "memory": "8gb",
+        "cpus": 4
+    },
+    "capAdd": [
+        "SYS_PTRACE"
+    ],
+    "securityOpt": [
+        "seccomp=unconfined"
+    ]
 }

@@ -1,9 +1,9 @@
-# Virtual environment (created inside container, not needed in build context)
-.venv/
-venv/
-env/
+# Git
+.git
+.gitignore
+.gitattributes
 
-# Python cache and compiled files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -24,67 +24,79 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Testing and coverage
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.nox/
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.virtualenv
 
-# Linting and formatting cache
-.ruff_cache/
-.mypy_cache/
-
-# IDE and editor files
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
 
-# Git
-.git/
-.gitignore
+# Testing
+.tox/
+.coverage
+.pytest_cache/
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Documentation
+docs/_build/
+*.md
+LICENSE
+
+# Data and caches (will be mounted as volumes)
+data/
+*.csv
+*.json
+*.pkl
+*.h5
+*.hdf5
+
+# Models and weights
+*.pth
+*.pt
+*.ckpt
+*.safetensors
 
 # Logs
 *.log
 logs/
+wandb/
 
-# Environment variables (may contain secrets)
-.env
-.env.*
-!.env.example
+# OS
+.DS_Store
+Thumbs.db
 
-# Data directories (should be mounted as volumes)
-data/
-datasets/
-models/
-checkpoints/
-
-# Jupyter notebook checkpoints
-.ipynb_checkpoints/
-
-# Container-specific files
+# Dev container specific
 .devcontainer/
-Dockerfile*
 docker-compose*.yml
 
-# Documentation build
-docs/_build/
+# Environment files
+.env*
+!.env.example
 
 # Temporary files
 tmp/
 temp/
 *.tmp
-*.temp
+
+# Large files that should be downloaded at runtime
+*.zip
+*.tar.gz
+*.tar.bz2
