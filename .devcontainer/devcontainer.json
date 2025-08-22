@@ -1,21 +1,30 @@
 {
-  "name": "torch_starter-optimized (CUDA 12.4, uv, Py3.12)",
+  "name": "torch_starter-cuda (CUDA 12.4, uv, Py3.12)",
   "build": {
     "dockerfile": "Dockerfile",
     "context": "..",
     "options": [
       "--build-arg",
-      "BUILDKIT_INLINE_CACHE=1"
+      "BUILDKIT_INLINE_CACHE=1",
+      "--build-arg",
+      "PYTHON_VERSION=3.12",
+      "--build-arg",
+      "CUDA_VERSION=12.4"
     ]
   },
   "runArgs": [
     "--gpus",
     "all",
-    "--shm-size=2g",
+    "--runtime=nvidia",
+    "--shm-size=4g",
     "--ulimit",
     "memlock=-1",
     "--ulimit",
-    "stack=67108864"
+    "stack=67108864",
+    "--cap-add",
+    "SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined"
   ],
   "containerUser": "vscode",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
@@ -26,8 +35,17 @@
     "KAGGLE_CONFIG_DIR": "/home/vscode/.kaggle",
     "UV_LINK_MODE": "copy",
     "UV_COMPILE_BYTECODE": "1",
+    "UV_CONCURRENT_DOWNLOADS": "10",
     "PYTHONDONTWRITEBYTECODE": "1",
-    "CUDA_VISIBLE_DEVICES": "all"
+    "PYTHONUNBUFFERED": "1",
+    "CUDA_VERSION": "12.4",
+    "CUDA_VISIBLE_DEVICES": "all",
+    "NVIDIA_VISIBLE_DEVICES": "all",
+    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+    "NVIDIA_REQUIRE_CUDA": "cuda>=12.4",
+    "TORCH_CUDA_ARCH_LIST": "7.0;7.5;8.0;8.6;8.9;9.0",
+    "FORCE_CUDA": "1",
+    "TORCH_USE_CUDA_DSA": "1"
   },
   "mounts": [
     {
@@ -54,16 +72,22 @@
       "source": "torch-starter-uv-cache",
       "target": "/home/vscode/.cache/uv",
       "type": "volume"
+    },
+    {
+      "source": "torch-starter-pip-cache",
+      "target": "/home/vscode/.cache/pip",
+      "type": "volume"
     }
   ],
   "initializeCommand": [
     "bash",
     "-c",
-    "docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true"
+    "docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true; docker volume create torch-starter-pip-cache 2>/dev/null || true"
   ],
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
-      "configureZshAsDefaultShell": true
+      "configureZshAsDefaultShell": true,
+      "upgradePackages": false
     },
     "ghcr.io/devcontainers/features/git:1": {
       "ppa": false,
@@ -71,8 +95,9 @@
     }
   },
   "postCreateCommand": {
-    "activate-env": "bash -c 'source .venv/bin/activate && python -c \"import torch; print(f\\\"🚀 Environment ready! CUDA: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}\\\")\"'",
-    "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}"
+    "activate-env": "bash -c 'source .venv/bin/activate && python -c \"import sys; print(f\\\"🐍 Python {sys.version}\\\")\" && python -c \"import torch; print(f\\\"🔥 PyTorch {torch.__version__}\\\"); print(f\\\"🚀 CUDA Available: {torch.cuda.is_available()}\\\"); print(f\\\"📱 CUDA Devices: {torch.cuda.device_count()}\\\") if torch.cuda.is_available() else print(\\\"⚠️  CUDA Not Available\\\")\"'",
+    "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}",
+    "verify-cuda": "bash -c 'if command -v nvidia-smi >/dev/null 2>&1; then echo \"🖥️  GPU Information:\"; nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader; else echo \"⚠️  nvidia-smi not available\"; fi'"
   },
   "customizations": {
     "vscode": {
@@ -87,41 +112,55 @@
         "RooVeterinaryInc.roo-cline",
         "mechatroner.rainbow-csv",
         "gaogaotiantian.viztracer-vscode",
-        "bierner.markdown-mermaid"
+        "bierner.markdown-mermaid",
+        "ms-toolsai.vscode-ai-remote",
+        "GitHub.copilot"
       ],
       "settings": {
-        // Python settings
         "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python",
         "python.terminal.activateEnvironment": true,
         "python.analysis.typeCheckingMode": "basic",
         "python.analysis.autoImportCompletions": true,
         "python.analysis.indexing": true,
-        // Testing
+        "python.analysis.packageIndexDepths": [
+          {
+            "name": "sklearn",
+            "depth": 2
+          },
+          {
+            "name": "torch",
+            "depth": 3
+          },
+          {
+            "name": "transformers",
+            "depth": 2
+          }
+        ],
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
         "python.testing.pytestArgs": [
           "tests"
         ],
-        // Ruff configuration  
         "ruff.enable": true,
         "ruff.organizeImports": true,
         "ruff.serverEnabled": true,
         "ruff.lint.enable": true,
         "ruff.format.enable": true,
-        // Editor performance
         "files.watcherExclude": {
           "**/.venv/**": true,
           "**/__pycache__/**": true,
           "**/.mypy_cache/**": true,
           "**/.ruff_cache/**": true,
           "**/.pytest_cache/**": true,
-          "**/node_modules/**": true
+          "**/node_modules/**": true,
+          "**/.cache/**": true
         },
         "search.exclude": {
           "**/.venv": true,
           "**/__pycache__": true,
           "**/.mypy_cache": true,
-          "**/.ruff_cache": true
+          "**/.ruff_cache": true,
+          "**/.cache": true
         },
         "files.exclude": {
           "**/.venv": false,
@@ -130,18 +169,53 @@
           "**/.ruff_cache": true,
           "**/.pytest_cache": true
         },
-        // Terminal settings
         "terminal.integrated.defaultProfile.linux": "zsh",
         "terminal.integrated.shellIntegration.enabled": true,
-        // Jupyter settings
+        "terminal.integrated.env.linux": {
+          "CUDA_VISIBLE_DEVICES": "all"
+        },
         "jupyter.askForKernelRestart": false,
+        "jupyter.defaultKernel": "torch_starter-3.12",
         "notebook.experimental.openGettingStarted": false,
-        // Git settings
+        "notebook.kernelProviderAssociations": [
+          {
+            "viewType": "jupyter-notebook",
+            "kernelspec": "torch_starter-3.12"
+          }
+        ],
         "git.enableSmartCommit": true,
         "git.autofetch": true,
-        // Performance settings
         "extensions.autoUpdate": false,
-        "telemetry.telemetryLevel": "off"
+        "telemetry.telemetryLevel": "off",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports.ruff": "explicit",
+          "source.fixAll.ruff": "explicit"
+        },
+        "editor.rulers": [
+          88,
+          100
+        ],
+        "workbench.colorTheme": "Default Dark+",
+        "workbench.preferredDarkColorTheme": "Default Dark+",
+        "workbench.preferredLightColorTheme": "Default Light+",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
+            "source.fixAll": "explicit"
+          },
+          "editor.formatOnSave": true
+        },
+        "[dockerfile]": {
+          "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+        },
+        "[json]": {
+          "editor.defaultFormatter": "vscode.json-language-features"
+        },
+        "[jsonc]": {
+          "editor.defaultFormatter": "vscode.json-language-features"
+        }
       }
     }
   },
@@ -152,13 +226,17 @@
   "shutdownAction": "stopContainer",
   "hostRequirements": {
     "gpu": "optional",
-    "memory": "8gb",
-    "cpus": 4
+    "memory": "12gb",
+    "cpus": 8
   },
   "capAdd": [
     "SYS_PTRACE"
   ],
   "securityOpt": [
     "seccomp=unconfined"
-  ]
+  ],
+  "onCreateCommand": "echo '🏗️  Container created successfully'",
+  "updateContentCommand": "echo '🔄 Content updated'",
+  "postStartCommand": "echo '🚀 Development environment ready!'",
+  "waitFor": "postCreateCommand"
 }
