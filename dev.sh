@@ -61,7 +61,8 @@ ensure_uv_and_python() {
     exit 1
   }
   log_success "Environment setup complete"
- 
+}
+
 # CUDA version management
 
 check_cuda_compatibility() {
@@ -70,7 +71,7 @@ check_cuda_compatibility() {
     
     if [[ "$pytorch_cuda_version" == "none" ]]; then
         fail "PyTorch was not compiled with CUDA support"
-        info "Reinstall with: uv sync --extra torch-cu124"
+        info "Reinstall with: uv sync --extra torch-cu126"
         return 1
     fi
     
@@ -102,13 +103,13 @@ import json
 try:
     with open('.devcontainer/devcontainer.json') as f:
         config = json.load(f)
-        cuda_version = config.get('containerEnv', {}).get('CUDA_VERSION', '12.4')
+        cuda_version = config.get('containerEnv', {}).get('CUDA_VERSION', '12.6.1')
         print(cuda_version)
 except:
-    print('12.4')
+    print('12.6.1')
 " 2>/dev/null || echo "12.4"
   else
-    echo "12.4"
+    echo "12.6.1"
   fi
 }
 
@@ -162,7 +163,6 @@ except Exception as e:
   
   log_success "CUDA version set to $version"
   log_info "Rebuild container to apply changes: Ctrl+Shift+P → 'Dev Container: Rebuild Container'"
-}
 }
 
 # Performance-optimized commands with better error handling

@@ -1,18 +1,18 @@
 # syntax=docker/dockerfile:1.7
 
 # Multi-stage build for CUDA-enabled PyTorch development environment
-# Uses NVIDIA CUDA 12.4 runtime with optimized layer caching
+# Uses NVIDIA CUDA 12.6.1 runtime with optimized layer caching
 
 # ==============================================================================
 # CUDA Base Stage - NVIDIA CUDA runtime with development tools
 # ==============================================================================
-FROM nvidia/cuda:12.4-cudnn8-devel-ubuntu24.04 AS cuda-base
+FROM nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04 AS cuda-base
 
 # Build arguments for cache control and versioning
 ARG BUILDKIT_INLINE_CACHE=1
 ARG PYTHON_VERSION=3.12
-ARG CUDA_VERSION=12.4
-ARG APP_USER=vscode
+ARG CUDA_VERSION=12.6.1
+ARG APP_USER=ubuntu
 ARG APP_UID=1000
 ARG APP_GID=1000
 
@@ -26,12 +26,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LIBRARY_PATH} \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    NVIDIA_REQUIRE_CUDA="cuda>=12.4" \
+    NVIDIA_REQUIRE_CUDA="cuda>=12.6.1" \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
 # Verify CUDA installation and create symlinks
-RUN ln -sf /usr/local/cuda-12.4 /usr/local/cuda && \
+RUN ln -sf /usr/local/cuda-12.6.1 /usr/local/cuda && \
     echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && \
     echo "/usr/local/cuda/compat" >> /etc/ld.so.conf.d/cuda.conf && \
     ldconfig && \
@@ -74,10 +74,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 FROM system-deps AS user-setup
 
 # Create user with same UID/GID as host user for seamless file permissions
-RUN groupadd -g ${APP_GID} ${APP_USER} && \
-    useradd -m -u ${APP_UID} -g ${APP_GID} -s /bin/bash ${APP_USER} && \
-    # Add user to sudo group for container admin tasks
-    usermod -aG sudo ${APP_USER} && \
+# Use existing ubuntu user (UID 1000) and configure for development
+RUN usermod -aG sudo ${APP_USER} && \
     # Allow passwordless sudo for convenience in dev environment
     echo "${APP_USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     # Create all necessary directories with proper ownership
@@ -152,7 +150,7 @@ RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=${A
     --index-strategy unsafe-best-match \
     --extra dev \
     --extra notebook \
-    --extra torch-cu124 \
+    --extra torch-cu126 \
     --extra datascience \
     --extra tracking \
     --extra profiling \
@@ -264,10 +262,10 @@ CMD ["/bin/bash", "-l"]
 # ==============================================================================
 LABEL org.opencontainers.image.title="torch_starter" \
     org.opencontainers.image.description="CUDA-enabled PyTorch development environment with Python 3.12" \
-    org.opencontainers.image.version="2.1-cuda12.4" \
+    org.opencontainers.image.version="2.1-cuda12.6" \
     org.opencontainers.image.vendor="PyTorch DevContainer" \
     org.opencontainers.image.licenses="MIT" \
-    cuda.version="12.4" \
+    cuda.version="12.6.1" \
     pytorch.version=">=2.4.0" \
     python.version="3.12"
 

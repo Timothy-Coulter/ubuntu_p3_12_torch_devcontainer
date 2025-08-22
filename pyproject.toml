@@ -62,12 +62,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# PyTorch with CUDA 12.4 support - primary ML framework
-torch-cu124 = [
-  # Use PyTorch CUDA 12.4 index for GPU support
-  "--index-url https://download.pytorch.org/whl/cu124",
+# PyTorch with CUDA 12.6 support - primary ML framework
+torch-cu126 = [
+  # PyTorch packages with CUDA 12.6 support
   "torch>=2.4.0,<2.6",
-  "torchvision>=0.19.0,<0.21", 
+  "torchvision>=0.19.0,<0.21",
   "torchaudio>=2.4.0,<2.6",
   # Additional PyTorch ecosystem
   "torchtext>=0.18.0,<0.19",
@@ -233,6 +232,9 @@ packages = ["torch_starter"]
 
 [tool.hatch.version]
 path = "torch_starter/__init__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 # ==============================================================================
 # RUFF CONFIGURATION - Modern Python linting and formatting
@@ -513,7 +515,6 @@ resolution = "highest"
 compile-bytecode = true
 link-mode = "copy"
 concurrent-downloads = 10
-http-timeout = 300
 keyring-provider = "subprocess"
 
 # Default dependency groups to install
@@ -526,9 +527,9 @@ url = "https://pypi.org/simple"
 default = true
 
 # PyTorch CUDA 12.4 wheels index
-[[tool.uv.index]] 
-name = "pytorch-cu124"
-url = "https://download.pytorch.org/whl/cu124"
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
 # ==============================================================================
@@ -547,7 +548,7 @@ skips = ["**/test_*.py", "tests/**"]
 [tool.black]
 line-length = 100
 target-version = ['py312']
-include = '\.pyi?
+include = '\.pyi?$'
 extend-exclude = '''
 /(
   \.eggs

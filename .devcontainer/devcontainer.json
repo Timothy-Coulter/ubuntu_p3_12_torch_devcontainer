@@ -1,5 +1,5 @@
 {
-  "name": "torch_starter-cuda (CUDA 12.4, uv, Py3.12)",
+  "name": "torch_starter-cuda (CUDA 12.6.1, uv, Py3.12)",
   "build": {
     "dockerfile": "Dockerfile",
     "context": "..",
@@ -9,7 +9,7 @@
       "--build-arg",
       "PYTHON_VERSION=3.12",
       "--build-arg",
-      "CUDA_VERSION=12.4"
+      "CUDA_VERSION=12.6.1"
     ]
   },
   "runArgs": [
@@ -26,23 +26,23 @@
     "--security-opt",
     "seccomp=unconfined"
   ],
-  "containerUser": "vscode",
+  "containerUser": "ubuntu",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "containerEnv": {
-    "HF_HOME": "/home/vscode/.cache/huggingface",
-    "TRANSFORMERS_CACHE": "/home/vscode/.cache/huggingface",
-    "TORCH_HOME": "/home/vscode/.cache/torch",
-    "KAGGLE_CONFIG_DIR": "/home/vscode/.kaggle",
+    "HF_HOME": "/home/ubuntu/.cache/huggingface",
+    "TRANSFORMERS_CACHE": "/home/ubuntu/.cache/huggingface",
+    "TORCH_HOME": "/home/ubuntu/.cache/torch",
+    "KAGGLE_CONFIG_DIR": "/home/ubuntu/.kaggle",
     "UV_LINK_MODE": "copy",
     "UV_COMPILE_BYTECODE": "1",
     "UV_CONCURRENT_DOWNLOADS": "10",
     "PYTHONDONTWRITEBYTECODE": "1",
     "PYTHONUNBUFFERED": "1",
-    "CUDA_VERSION": "12.4",
+    "CUDA_VERSION": "12.6.1",
     "CUDA_VISIBLE_DEVICES": "all",
     "NVIDIA_VISIBLE_DEVICES": "all",
     "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
-    "NVIDIA_REQUIRE_CUDA": "cuda>=12.4",
+    "NVIDIA_REQUIRE_CUDA": "cuda>=12.6.1",
     "TORCH_CUDA_ARCH_LIST": "7.0;7.5;8.0;8.6;8.9;9.0",
     "FORCE_CUDA": "1",
     "TORCH_USE_CUDA_DSA": "1"
@@ -50,17 +50,17 @@
   "mounts": [
     {
       "source": "torch-starter-hf-cache",
-      "target": "/home/vscode/.cache/huggingface",
+      "target": "/home/ubuntu/.cache/huggingface",
       "type": "volume"
     },
     {
       "source": "torch-starter-torch-cache",
-      "target": "/home/vscode/.cache/torch",
+      "target": "/home/ubuntu/.cache/torch",
       "type": "volume"
     },
     {
       "source": "torch-starter-kaggle-cache",
-      "target": "/home/vscode/.kaggle",
+      "target": "/home/ubuntu/.kaggle",
       "type": "volume"
     },
     {
@@ -70,12 +70,12 @@
     },
     {
       "source": "torch-starter-uv-cache",
-      "target": "/home/vscode/.cache/uv",
+      "target": "/home/ubuntu/.cache/uv",
       "type": "volume"
     },
     {
       "source": "torch-starter-pip-cache",
-      "target": "/home/vscode/.cache/pip",
+      "target": "/home/ubuntu/.cache/pip",
       "type": "volume"
     }
   ],

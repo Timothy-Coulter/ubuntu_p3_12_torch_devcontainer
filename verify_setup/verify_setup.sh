@@ -171,18 +171,18 @@ check_cuda_compatibility() {
     
     if [[ "$pytorch_cuda_version" == "none" ]]; then
         fail "PyTorch was not compiled with CUDA support"
-        info "Reinstall with: uv sync --extra torch-cu130"
+        info "Reinstall with: uv sync --extra torch-cu126"
         return 1
     fi
     
     info "PyTorch CUDA version: $pytorch_cuda_version"
     
-    # Verify CUDA 13.0 compatibility
-    if [[ "$pytorch_cuda_version" != "13.0" ]]; then
-        warn "PyTorch CUDA version ($pytorch_cuda_version) differs from expected CUDA 13.0"
-        info "This container is optimized for CUDA 13.0"
+    # Verify CUDA 12.6.1 compatibility
+    if [[ "$pytorch_cuda_version" != "12.6" ]]; then
+        warn "PyTorch CUDA version ($pytorch_cuda_version) differs from expected CUDA 12.6"
+        info "This container is optimized for CUDA 12.6.1"
     else
-        pass "PyTorch CUDA 13.0 compatibility confirmed"
+        pass "PyTorch CUDA 12.6 compatibility confirmed"
     fi
 }
 
@@ -232,11 +232,11 @@ try:
         print(f"  PyTorch CUDA version: {info['cuda_version']}")
         if info['cuda_version'] == "unknown" or info['cuda_version'] is None:
             print("  ⚠ PyTorch was not compiled with CUDA support")
-            print("  💡 Reinstall PyTorch with CUDA: uv sync --extra torch-cu130")
+            print("  💡 Reinstall PyTorch with CUDA: uv sync --extra torch-cu126")
         else:
             print("  ✓ PyTorch was compiled with CUDA support")
-            if info['cuda_version'] != "13.0":
-                print(f"  ⚠ Expected CUDA 13.0, found: {info['cuda_version']}")
+            if info['cuda_version'] != "12.6":
+                print(f"  ⚠ Expected CUDA 12.6, found: {info['cuda_version']}")
             print("  ⚠ CUDA runtime libraries may be missing or incompatible")
             print("  💡 Check CUDA runtime installation in container")
     
@@ -308,7 +308,7 @@ try:
 
 except ImportError as e:
     print(f"✗ PyTorch import failed: {e}")
-    print("💡 Run: uv sync --extra torch-cu130")
+    print("💡 Run: uv sync --extra torch-cu126")
     sys.exit(1)
 except Exception as e:
     print(f"✗ PyTorch verification failed: {e}")
@@ -329,10 +329,10 @@ PY
 check_caches_rw() {
   section "Cache and Data Directories"
   
-  local hf="${HF_HOME:-/home/vscode/.cache/huggingface}"
+  local hf="${HF_HOME:-/home/ubuntu/.cache/huggingface}"
   local tf="${TRANSFORMERS_CACHE:-$hf}"
-  local th="${TORCH_HOME:-/home/vscode/.cache/torch}"
-  local kg="${KAGGLE_CONFIG_DIR:-/home/vscode/.kaggle}"
+  local th="${TORCH_HOME:-/home/ubuntu/.cache/torch}"
+  local kg="${KAGGLE_CONFIG_DIR:-/home/ubuntu/.kaggle}"
   local uv_cache="${HOME}/.cache/uv"
   local data_dir="${DATA_DIR:-${PWD}/data}"
   
@@ -408,7 +408,7 @@ print_cuda_runtime_info() {
   
   # Check CUDA library paths
   info "CUDA library path checks:"
-  local cuda_paths=("/usr/local/cuda-13.0/lib64" "/usr/local/cuda/lib64" "/usr/lib/x86_64-linux-gnu")
+  local cuda_paths=("/usr/local/cuda-12.6.1/lib64" "/usr/local/cuda/lib64" "/usr/lib/x86_64-linux-gnu")
   for path in "${cuda_paths[@]}"; do
     if [[ -d "$path" ]]; then
       local cuda_libs=$(find "$path" -name "libcuda*" 2>/dev/null | wc -l)
@@ -568,7 +568,7 @@ check_environment_config() {
     "NVIDIA_VISIBLE_DEVICES:NVIDIA device visibility"
     "NVIDIA_DRIVER_CAPABILITIES:NVIDIA driver capabilities"
     "LD_LIBRARY_PATH:Library search path"
-    "CUDA_HOME:CUDA 13.0 installation path"
+    "CUDA_HOME:CUDA 12.6.1 installation path"
   )
   
   for var_desc in "${env_vars[@]}"; do
