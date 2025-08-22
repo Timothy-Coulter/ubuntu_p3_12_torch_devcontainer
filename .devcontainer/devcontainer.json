@@ -1,5 +1,5 @@
 {
-  "name": "torch_starter-cuda (CUDA 13.0, uv, Py3.12)",
+  "name": "torch_starter-cuda (CUDA 12.9, uv, Py3.12)",
   "build": {
     "dockerfile": "Dockerfile",
     "context": "..",
@@ -9,7 +9,7 @@
       "--build-arg",
       "PYTHON_VERSION=3.12",
       "--build-arg",
-      "CUDA_VERSION=13.0"
+      "CUDA_VERSION=12.9"
     ]
   },
   "runArgs": [
@@ -38,11 +38,11 @@
     "UV_CONCURRENT_DOWNLOADS": "10",
     "PYTHONDONTWRITEBYTECODE": "1",
     "PYTHONUNBUFFERED": "1",
-    "CUDA_VERSION": "13.0",
+    "CUDA_VERSION": "12.9",
     "CUDA_VISIBLE_DEVICES": "all",
     "NVIDIA_VISIBLE_DEVICES": "all",
     "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
-    "NVIDIA_REQUIRE_CUDA": "cuda>=13.0",
+    "NVIDIA_REQUIRE_CUDA": "cuda>=12.9",
     "TORCH_CUDA_ARCH_LIST": "7.0;7.5;8.0;8.6;8.9;9.0",
     "FORCE_CUDA": "1",
     "TORCH_USE_CUDA_DSA": "1"

@@ -177,12 +177,12 @@ check_cuda_compatibility() {
     
     info "PyTorch CUDA version: $pytorch_cuda_version"
     
-    # Verify CUDA 12.6.1 compatibility
-    if [[ "$pytorch_cuda_version" != "12.6" ]]; then
-        warn "PyTorch CUDA version ($pytorch_cuda_version) differs from expected CUDA 12.6"
-        info "This container is optimized for CUDA 12.6.1"
+    # Verify CUDA 12.9.0 compatibility
+    if [[ "$pytorch_cuda_version" != "12.9" ]]; then
+        warn "PyTorch CUDA version ($pytorch_cuda_version) differs from expected CUDA 12.9"
+        info "This container is optimized for CUDA 12.9.0"
     else
-        pass "PyTorch CUDA 12.6 compatibility confirmed"
+        pass "PyTorch CUDA 12.9 compatibility confirmed"
     fi
 }
 
@@ -235,8 +235,8 @@ try:
             print("  💡 Reinstall PyTorch with CUDA: uv sync --extra torch-cu126")
         else:
             print("  ✓ PyTorch was compiled with CUDA support")
-            if info['cuda_version'] != "12.6":
-                print(f"  ⚠ Expected CUDA 12.6, found: {info['cuda_version']}")
+            if info['cuda_version'] != "12.9":
+                print(f"  ⚠ Expected CUDA 12.9, found: {info['cuda_version']}")
             print("  ⚠ CUDA runtime libraries may be missing or incompatible")
             print("  💡 Check CUDA runtime installation in container")
     
@@ -326,6 +326,28 @@ PY
   fi
 }
 
+check_cuda_linkage() {
+  section "CUDA Library Linkage"
+
+  local py
+  py="$(python_exec)"
+  local torch_lib
+  torch_lib=$($py -c "import torch; import os; print(os.path.join(os.path.dirname(torch.__file__), 'lib', 'libtorch_cuda.so'))" 2>/dev/null || echo "")
+
+  if [[ -f "$torch_lib" ]]; then
+    info "Checking linkage for: $torch_lib"
+    if ldd "$torch_lib" | grep -q "/usr/local/cuda"; then
+      pass "PyTorch is linked against system CUDA libraries"
+    else
+      warn "PyTorch may be using bundled CUDA libraries!"
+      info "ldd output:"
+      ldd "$torch_lib" | grep cuda || true
+    fi
+  else
+    warn "Could not locate libtorch_cuda.so — skipping linkage check"
+  fi
+}
+
 check_caches_rw() {
   section "Cache and Data Directories"
   
@@ -408,7 +430,7 @@ print_cuda_runtime_info() {
   
   # Check CUDA library paths
   info "CUDA library path checks:"
-  local cuda_paths=("/usr/local/cuda-12.6.1/lib64" "/usr/local/cuda/lib64" "/usr/lib/x86_64-linux-gnu")
+  local cuda_paths=("/usr/local/cuda-12.9.0/lib64" "/usr/local/cuda/lib64" "/usr/lib/x86_64-linux-gnu")
   for path in "${cuda_paths[@]}"; do
     if [[ -d "$path" ]]; then
       local cuda_libs=$(find "$path" -name "libcuda*" 2>/dev/null | wc -l)
@@ -568,7 +590,7 @@ check_environment_config() {
     "NVIDIA_VISIBLE_DEVICES:NVIDIA device visibility"
     "NVIDIA_DRIVER_CAPABILITIES:NVIDIA driver capabilities"
     "LD_LIBRARY_PATH:Library search path"
-    "CUDA_HOME:CUDA 12.6.1 installation path"
+    "CUDA_HOME:CUDA 12.9.0 installation path"
   )
   
   for var_desc in "${env_vars[@]}"; do
@@ -734,6 +756,7 @@ main() {
   check_imports_and_versions || warn "Package verification had issues"
   check_pytorch_cuda || warn "PyTorch/CUDA verification had issues"
   check_cuda_compatibility || warn "CUDA compatibility check had issues"
+  check_cuda_linkage
   check_caches_rw
   print_cuda_runtime_info
   check_performance

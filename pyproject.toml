@@ -1,89 +1,44 @@
 [project]
 name = "torch-starter"
 version = "0.1.0"
-description = "CUDA-enabled PyTorch deep learning development environment with uv, CUDA 12.4, and VS Code Dev Containers."
+description = "CUDA-enabled PyTorch deep learning development environment with uv and VS Code Dev Containers (uses host CUDA libraries)."
 requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }
 authors = [{ name = "Your Name", email = "your.email@domain.com" }]
 maintainers = [{ name = "Your Name", email = "your.email@domain.com" }]
 keywords = ["deep-learning", "pytorch", "transformers", "cuda", "gpu", "uv", "devcontainer"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-]
 
-# Core dependencies - essential packages for data science and ML
+# Core dependencies
 dependencies = [
-  # Core scientific computing stack
   "numpy>=1.26,<2.1",
   "pandas>=2.2,<2.3",
   "scipy>=1.12,<1.15",
-  
-  # Machine learning essentials  
   "scikit-learn>=1.4,<1.6",
   "tqdm>=4.66,<5.0",
-  
-  # Deep learning ecosystem (CPU versions - GPU versions in extras)
+
+  # PyTorch (CPU wheel, links to preinstalled CUDA at runtime)
   "torch",
+
   "transformers>=4.44,<4.46",
   "datasets>=2.19,<3.1",
   "accelerate>=0.33,<1.0",
   "safetensors>=0.4.2,<1.0",
-  
-  # Tokenization and text processing
   "sentencepiece>=0.2,<1.0",
   "tokenizers>=0.19,<1.0",
-  
-  # Image processing
   "pillow>=10.0,<11.0",
   "albumentations>=1.4,<2.0",
-  
-  # Visualization essentials (minimal for performance)
   "matplotlib>=3.8,<3.10",
-  
-  # Jupyter essentials
   "jupyter>=1.0,<2.0",
   "ipykernel>=6.29,<7.0",
   "ipywidgets>=8.1,<9.0",
-  
-  # Configuration and utilities
   "pyyaml>=6.0,<7.0",
   "requests>=2.32,<3.0",
   "python-dotenv>=1.0,<2.0",
-  
-  # Development utilities
   "rich>=13.7,<14.0",
   "typer>=0.12,<1.0",
 ]
 
 [project.optional-dependencies]
-# PyTorch with CUDA 12.6 support - legacy ML framework
-torch-cu126 = [
-  # PyTorch packages with CUDA 12.6 support
-  "torch>=2.4.0,<2.6",
-  "torchvision>=0.19.0,<0.21",
-  "torchaudio>=2.4.0,<2.6",
-  # Additional PyTorch ecosystem
-  "torchtext>=0.18.0,<0.19",
-  "lightning>=2.4,<3.0",
-]
-
-# PyTorch with CUDA 12.1 support - compatible with CUDA 13.0 host
-torch-cu121 = [
-  # PyTorch packages with CUDA 12.1 support (forward compatible with CUDA 13.0)
-  "torch>=2.4.0,<2.6",
-  "torchvision>=0.19.0,<0.21",
-  "torchaudio>=2.4.0,<2.6",
-  # Additional PyTorch ecosystem
-  "torchtext>=0.18.0,<0.19",
-  "lightning>=2.4,<3.0",
-]
 
 # Development tools - code quality and testing
 dev = [
@@ -535,18 +490,6 @@ keyring-provider = "subprocess"
 name = "pypi"
 url = "https://pypi.org/simple"
 default = true
-
-# PyTorch CUDA 12.6 wheels index
-[[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
-explicit = true
-
-# PyTorch CUDA 12.1 wheels index
-[[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
-explicit = true
 
 # ==============================================================================
 # BANDIT CONFIGURATION - Security linting
