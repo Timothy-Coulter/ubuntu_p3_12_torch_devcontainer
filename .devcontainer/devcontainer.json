@@ -1,5 +1,5 @@
 {
-  "name": "torch_starter-optimized (CUDA 12.6, uv, Py3.12)",
+  "name": "torch_starter-optimized (CUDA 12.4, uv, Py3.12)",
   "build": {
     "dockerfile": "Dockerfile",
     "context": "..",
@@ -11,16 +11,13 @@
   "runArgs": [
     "--gpus",
     "all",
-    "--shm-size=8g",
+    "--shm-size=2g",
     "--ulimit",
     "memlock=-1",
     "--ulimit",
-    "stack=67108864",
-    "--runtime=nvidia",
-    "--security-opt",
-    "no-new-privileges:true"
+    "stack=67108864"
   ],
-  "containerUser": "ubuntu",
+  "containerUser": "vscode",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "containerEnv": {
     "HF_HOME": "/home/vscode/.cache/huggingface",
@@ -30,11 +27,7 @@
     "UV_LINK_MODE": "copy",
     "UV_COMPILE_BYTECODE": "1",
     "PYTHONDONTWRITEBYTECODE": "1",
-    "CUDA_VISIBLE_DEVICES": "all",
-    "NVIDIA_VISIBLE_DEVICES": "all",
-    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
-    "LD_LIBRARY_PATH": "/usr/local/cuda-12.6/lib64:${LD_LIBRARY_PATH}",
-    "CUDA_HOME": "/usr/local/cuda-12.6"
+    "CUDA_VISIBLE_DEVICES": "all"
   },
   "mounts": [
     {
@@ -61,143 +54,111 @@
       "source": "torch-starter-uv-cache",
       "target": "/home/vscode/.cache/uv",
       "type": "volume"
-    },
-    {
-      "source": "${localWorkspaceFolder}/.env.local",
-      "target": "/workspaces/${localWorkspaceFolderBasename}/.env.local",
-      "type": "bind",
-      "consistency": "cached"
     }
   ],
   "initializeCommand": [
     "bash",
     "-c",
-    "
-    # --- Check NVIDIA driver before container build ---
-    if ! command -v nvidia-smi &> /dev/null; then
-        echo '❌ NVIDIA driver not found (nvidia-smi missing). Please install it before building.' >&2
-        exit 1
-    fi
-
-    REQUIRED_MAJOR=555
-    REQUIRED_MINOR=42
-    DRV_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n1)
-    DRV_MAJOR=$(echo $DRV_VER | cut -d. -f1)
-    DRV_MINOR=$(echo $DRV_VER | cut -d. -f2)
-
-    echo '🔍 Found NVIDIA driver:' $DRV_VER
-
-    if [ \"$DRV_MAJOR\" -gt \"$REQUIRED_MAJOR\" ] || \
-      ([ \"$DRV_MAJOR\" -eq \"$REQUIRED_MAJOR\" ] && [ \"$DRV_MINOR\" -ge \"$REQUIRED_MINOR\" ]); then
-        echo '✅ Driver is new enough for CUDA 12.6'
-    else
-        echo '❌ Driver too old (need ≥' ${REQUIRED_MAJOR
-      }.${REQUIRED_MINOR
-      } '). Upgrade your driver.' >&2
-        exit 1
-    fi
-
-    # --- Existing volume setup ---
-    docker volume create torch-starter-hf-cache 2>/dev/null || true;
-    docker volume create torch-starter-torch-cache 2>/dev/null || true;
-    docker volume create torch-starter-kaggle-cache 2>/dev/null || true;
-    docker volume create torch-starter-data 2>/dev/null || true;
-    docker volume create torch-starter-uv-cache 2>/dev/null || true;
-    touch .env.local 2>/dev/null || true
-    "
-    ],
-    "features": {
-      "ghcr.io/devcontainers/features/common-utils:2": {
-        "configureZshAsDefaultShell": true
-      },
-      "ghcr.io/devcontainers/features/git:1": {
-        "ppa": false,
-        "version": "os-provided"
-      }
+    "docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true"
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true
     },
-    "postCreateCommand": {
-      "activate-env": "bash -c 'source .venv/bin/activate && python - <<EOF\nimport torch; print(f\"🚀 Env ready! PyTorch: {torch.__version__}, CUDA Toolkit: {torch.version.cuda}, Available: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}\")\nEOF'",
-      "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}",
-      "setup-env": "bash -c '[ ! -f .env.local ] && cp templates/env.local .env.local && chmod 600 .env.local && echo \"📝 Created .env.local from template\" || echo \"✓ .env.local already exists\"'"
-    },
-    "customizations": {
-      "vscode": {
-        "extensions": [
-          "ms-python.python",
-          "ms-python.vscode-pylance",
-          "ms-toolsai.jupyter",
-          "charliermarsh.ruff",
-          "eamodio.gitlens",
-          "EditorConfig.EditorConfig",
-          "ms-azuretools.vscode-docker",
-          "RooVeterinaryInc.roo-cline",
-          "mechatroner.rainbow-csv",
-          "gaogaotiantian.viztracer-vscode",
-          "bierner.markdown-mermaid",
-          "github.vscode-github-actions"
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": false,
+      "version": "os-provided"
+    }
+  },
+  "postCreateCommand": {
+    "activate-env": "bash -c 'source .venv/bin/activate && python -c \"import torch; print(f\\\"🚀 Environment ready! CUDA: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}\\\")\"'",
+    "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "charliermarsh.ruff",
+        "eamodio.gitlens",
+        "EditorConfig.EditorConfig",
+        "ms-azuretools.vscode-docker",
+        "RooVeterinaryInc.roo-cline",
+        "mechatroner.rainbow-csv",
+        "gaogaotiantian.viztracer-vscode",
+        "bierner.markdown-mermaid"
+      ],
+      "settings": {
+        // Python settings
+        "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.indexing": true,
+        // Testing
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestArgs": [
+          "tests"
         ],
-        "settings": {
-          "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python",
-          "python.terminal.activateEnvironment": true,
-          "python.analysis.typeCheckingMode": "basic",
-          "python.analysis.autoImportCompletions": true,
-          "python.analysis.indexing": true,
-          "python.testing.pytestEnabled": true,
-          "python.testing.unittestEnabled": false,
-          "python.testing.pytestArgs": [
-            "tests"
-          ],
-          "ruff.enable": true,
-          "ruff.organizeImports": true,
-          "ruff.serverEnabled": true,
-          "ruff.lint.enable": true,
-          "ruff.format.enable": true,
-          "files.watcherExclude": {
-            "**/.venv/**": true,
-            "**/__pycache__/**": true,
-            "**/.mypy_cache/**": true,
-            "**/.ruff_cache/**": true,
-            "**/.pytest_cache/**": true,
-            "**/node_modules/**": true
-          },
-          "search.exclude": {
-            "**/.venv": true,
-            "**/__pycache__": true,
-            "**/.mypy_cache": true,
-            "**/.ruff_cache": true
-          },
-          "files.exclude": {
-            "**/.venv": false,
-            "**/__pycache__": true,
-            "**/.mypy_cache": true,
-            "**/.ruff_cache": true,
-            "**/.pytest_cache": true
-          },
-          "terminal.integrated.defaultProfile.linux": "zsh",
-          "terminal.integrated.shellIntegration.enabled": true,
-          "jupyter.askForKernelRestart": false,
-          "notebook.experimental.openGettingStarted": false,
-          "git.enableSmartCommit": true,
-          "git.autofetch": true,
-          "extensions.autoUpdate": false,
-          "telemetry.telemetryLevel": "off"
-        }
+        // Ruff configuration  
+        "ruff.enable": true,
+        "ruff.organizeImports": true,
+        "ruff.serverEnabled": true,
+        "ruff.lint.enable": true,
+        "ruff.format.enable": true,
+        // Editor performance
+        "files.watcherExclude": {
+          "**/.venv/**": true,
+          "**/__pycache__/**": true,
+          "**/.mypy_cache/**": true,
+          "**/.ruff_cache/**": true,
+          "**/.pytest_cache/**": true,
+          "**/node_modules/**": true
+        },
+        "search.exclude": {
+          "**/.venv": true,
+          "**/__pycache__": true,
+          "**/.mypy_cache": true,
+          "**/.ruff_cache": true
+        },
+        "files.exclude": {
+          "**/.venv": false,
+          "**/__pycache__": true,
+          "**/.mypy_cache": true,
+          "**/.ruff_cache": true,
+          "**/.pytest_cache": true
+        },
+        // Terminal settings
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.shellIntegration.enabled": true,
+        // Jupyter settings
+        "jupyter.askForKernelRestart": false,
+        "notebook.experimental.openGettingStarted": false,
+        // Git settings
+        "git.enableSmartCommit": true,
+        "git.autofetch": true,
+        // Performance settings
+        "extensions.autoUpdate": false,
+        "telemetry.telemetryLevel": "off"
       }
-    },
-    "remoteEnv": {
-      "ROO_CONFIG_PATH": "/workspaces/${localWorkspaceFolderBasename}/.roo/roo.json",
-      "MCP_SERVERS_CONFIG": "/workspaces/${localWorkspaceFolderBasename}/.mcp/servers.json"
-    },
-    "shutdownAction": "stopContainer",
-    "hostRequirements": {
-      "gpu": true,
-      "memory": "8gb",
-      "cpus": 4
-    },
-    "capAdd": [
-      "SYS_PTRACE"
-    ],
-    "securityOpt": [
-      "seccomp=unconfined"
-    ]
-  }
+    }
+  },
+  "remoteEnv": {
+    "ROO_CONFIG_PATH": "/workspaces/${localWorkspaceFolderBasename}/.roo/roo.json",
+    "MCP_SERVERS_CONFIG": "/workspaces/${localWorkspaceFolderBasename}/.mcp/servers.json"
+  },
+  "shutdownAction": "stopContainer",
+  "hostRequirements": {
+    "gpu": "optional",
+    "memory": "8gb",
+    "cpus": 4
+  },
+  "capAdd": [
+    "SYS_PTRACE"
+  ],
+  "securityOpt": [
+    "seccomp=unconfined"
+  ]
+}
