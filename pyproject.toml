@@ -29,6 +29,9 @@ dependencies = [
   "kaggle>=1.6",
   "requests>=2.32.4",
   "plotly",
+  "pywavelets>=1.9.0",
+  "scikit-image>=0.25.2",
+  "viztracer"
 ]
 
 [project.optional-dependencies]
@@ -40,7 +43,7 @@ torch-cu124 = [
 ]
 
 dev = [
-  "ruff>=0.4.8",
+  "ruff>=0.5.3",
   "mypy>=1.10",
   "pytest>=8.2",
   "pytest-cov>=5.0",

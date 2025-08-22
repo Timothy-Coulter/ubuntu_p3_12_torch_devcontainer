@@ -38,7 +38,8 @@
                 "eamodio.gitlens",
                 "EditorConfig.EditorConfig",
                 "charliermarsh.ruff",
-                "RooVeterinaryInc.roo-cline"
+                "RooVeterinaryInc.roo-cline",
+                "gaogaotiantian.viztracer-vscode"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
@@ -50,9 +51,8 @@
                 ],
                 "ruff.enable": true,
                 "ruff.organizeImports": true,
-                "ruff.lint.args": [
-                    "--fix"
-                ],
+                "ruff.serverEnabled": true,
+                "ruff.serverPath": "ruff",
                 "mypy.args": [
                     "--config-file",
                     "${workspaceFolder}/pyproject.toml"
