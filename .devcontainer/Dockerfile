@@ -106,7 +106,7 @@ RUN debug-log "Installing Python ${PYTHON_VERSION}" && \
     debug-log "Python installation completed"
 
 # Copy dependency files first (better caching)
-COPY --chown=${APP_USER}:${APP_USER} pyproject.debug.toml pyproject.toml
+COPY --chown=${APP_USER}:${APP_USER} pyproject.toml ./
 COPY --chown=${APP_USER}:${APP_USER} uv.lock ./
 
 RUN debug-log "Creating virtual environment" && \
