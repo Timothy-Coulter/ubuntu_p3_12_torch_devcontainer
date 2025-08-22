@@ -6,12 +6,12 @@
 # ==============================================================================
 # CUDA Base Stage - NVIDIA CUDA runtime with development tools
 # ==============================================================================
-FROM nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04 AS cuda-base
+FROM nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04 AS cuda-base
 
 # Build arguments for cache control and versioning
 ARG BUILDKIT_INLINE_CACHE=1
 ARG PYTHON_VERSION=3.12
-ARG CUDA_VERSION=12.6.1
+ARG CUDA_VERSION=13.0
 ARG APP_USER=ubuntu
 ARG APP_UID=1000
 ARG APP_GID=1000
@@ -26,12 +26,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LIBRARY_PATH} \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    NVIDIA_REQUIRE_CUDA="cuda>=12.6.1" \
+    NVIDIA_REQUIRE_CUDA="cuda>=13.0" \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
 # Verify CUDA installation and create symlinks
-RUN ln -sf /usr/local/cuda-12.6.1 /usr/local/cuda && \
+RUN ln -sf /usr/local/cuda-13.0 /usr/local/cuda && \
     echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && \
     echo "/usr/local/cuda/compat" >> /etc/ld.so.conf.d/cuda.conf && \
     ldconfig && \
@@ -142,81 +142,23 @@ FROM python-env AS deps-install
 # Copy dependency files first for better Docker layer caching
 COPY --chown=${APP_USER}:${APP_USER} pyproject.toml uv.lock* ./
 
-# Install dependencies with comprehensive extras and cache mounting
+# Install only essential PyTorch CUDA dependencies for testing
 RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=${APP_GID} \
     . .venv/bin/activate && \
     uv sync \
     --no-install-project \
     --index-strategy unsafe-best-match \
-    --extra dev \
-    --extra notebook \
-    --extra torch-cu126 \
-    --extra datascience \
-    --extra tracking \
-    --extra profiling \
+    --extra torch-cu121 \
     --compile-bytecode && \
-    # Verify PyTorch CUDA installation
-    python -c "import torch; print(f'PyTorch {torch.__version__} with CUDA {torch.version.cuda}')" && \
-    python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')" || echo "CUDA check will complete at runtime" && \
-    echo "Dependencies installed successfully"
+    echo "PyTorch CUDA dependencies installed successfully"
 
 # ==============================================================================
 # ML Libraries Verification Stage - Test critical imports
 # ==============================================================================
 FROM deps-install AS ml-verify
 
-# Verify all critical ML libraries can be imported
-RUN . .venv/bin/activate && python -c "
-import sys
-print('Verifying ML library installations...')
-
-# Core libraries
-import numpy as np
-print(f'✓ NumPy {np.__version__}')
-
-import pandas as pd
-print(f'✓ Pandas {pd.__version__}')
-
-import sklearn
-print(f'✓ Scikit-learn {sklearn.__version__}')
-
-# PyTorch ecosystem
-import torch
-print(f'✓ PyTorch {torch.__version__}')
-print(f'  - CUDA compiled: {torch.version.cuda or \"No\"}')
-print(f'  - CUDA available: {torch.cuda.is_available()}')
-
-try:
-import torchvision
-print(f'✓ TorchVision {torchvision.__version__}')
-except ImportError:
-print('⚠ TorchVision not available')
-
-try:
-import torchaudio  
-print(f'✓ TorchAudio {torchaudio.__version__}')
-except ImportError:
-print('⚠ TorchAudio not available')
-
-# Transformers ecosystem
-try:
-import transformers
-print(f'✓ Transformers {transformers.__version__}')
-except ImportError:
-print('⚠ Transformers not available')
-
-try:
-import datasets
-print(f'✓ Datasets {datasets.__version__}')
-except ImportError:
-print('⚠ Datasets not available')
-
-# Visualization
-import matplotlib
-print(f'✓ Matplotlib {matplotlib.__version__}')
-
-print('Library verification completed!')
-"
+# Verify critical ML libraries can be imported
+RUN . .venv/bin/activate && python -c "import torch; print(f'PyTorch {torch.__version__} - CUDA: {torch.version.cuda} - Available: {torch.cuda.is_available()}')"
 
 # ==============================================================================
 # Final Application Stage - Install project and setup runtime
@@ -265,7 +207,7 @@ LABEL org.opencontainers.image.title="torch_starter" \
     org.opencontainers.image.version="2.1-cuda12.6" \
     org.opencontainers.image.vendor="PyTorch DevContainer" \
     org.opencontainers.image.licenses="MIT" \
-    cuda.version="12.6.1" \
+    cuda.version="13.0" \
     pytorch.version=">=2.4.0" \
     python.version="3.12"
 
