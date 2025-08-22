@@ -16,7 +16,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     UV_INSTALL_DIR=/usr/local/bin \
-    UV_CACHE_DIR=/tmp/uv-cache \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
@@ -36,8 +35,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install --system
 
-# Install uv with cache mount for faster rebuilds
-RUN --mount=type=cache,target=/tmp/uv-install \
+# Install uv
+RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
     curl -LsSf https://astral.sh/uv/install.sh | sh \
     && uv --version
 
@@ -52,7 +51,6 @@ RUN mkdir -p \
     ${HOME}/.cache/uv \
     ${HOME}/.kaggle \
     /workspaces/data \
-    /tmp/uv-cache \
     && chown -R ${APP_USER}:${APP_USER} ${HOME} /workspaces
 
 # Switch to user early
@@ -68,7 +66,7 @@ ENV UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=manual
 
 # Install Python with cache
-RUN --mount=type=cache,target=/tmp/uv-cache,uid=1000 \
+RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
     uv python install ${PYTHON_VERSION}
 
 # Dependency installation stage
@@ -78,17 +76,16 @@ FROM python-env AS deps-install
 COPY --chown=${APP_USER}:${APP_USER} pyproject.toml uv.lock ./
 
 # Create venv and install dependencies with cache mounting
-RUN --mount=type=cache,target=/tmp/uv-cache,uid=1000 \
-    --mount=type=cache,target=${HOME}/.cache/uv,uid=1000 \
+RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
     uv venv --clear .venv -p ${PYTHON_VERSION} \
     && . .venv/bin/activate \
     && uv sync \
-    --no-install-project \
-    --index-strategy unsafe-best-match \
-    --extra dev \
-    --extra notebook \
-    --extra torch-cu124 \
-    --compile-bytecode \
+        --no-install-project \
+        --index-strategy unsafe-best-match \
+        --extra dev \
+        --extra notebook \
+        --extra torch-cu124 \
+        --compile-bytecode \
     && echo "External dependencies installed"
 
 # Final stage - minimal layers for runtime
@@ -100,7 +97,9 @@ COPY --chown=${APP_USER}:${APP_USER} . .
 # Install project and setup Jupyter kernel in single layer
 RUN . .venv/bin/activate \
     && uv pip install -e . --compile-bytecode \
-    && python -m ipykernel install --user --name torch_starter-${PYTHON_VERSION} --display-name "Python ${PYTHON_VERSION} (torch_starter)" \
+    && python -m ipykernel install --user \
+        --name torch_starter-${PYTHON_VERSION} \
+        --display-name "Python ${PYTHON_VERSION} (torch_starter)" \
     && echo "Project setup completed"
 
 # Quick validation (non-blocking)
