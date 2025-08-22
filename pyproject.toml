@@ -38,6 +38,9 @@ dependencies = [
   # Configuration and utilities
   "pyyaml>=6.0,<7.0",
   "requests>=2.32.0,<3.0",
+  
+  # Environment management
+  "python-dotenv>=1.0,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -56,6 +59,7 @@ dev = [
   "pytest-cov>=5.0,<6.0",
   "types-requests>=2.32,<3.0",
   "types-PyYAML>=6.0,<7.0",
+  "pre-commit>=3.0,<4.0",
 ]
 
 # Extended data science tools (optional)
@@ -70,6 +74,7 @@ datascience = [
 notebook = [
   "jupyterlab>=4.2,<5.0",
   "ipdb>=0.13,<1.0",
+  "notebook>=7.0,<8.0",
 ]
 
 # Experiment tracking (optional)
@@ -87,6 +92,12 @@ data = [
 profiling = [
   "viztracer>=0.16,<1.0",
   "memory-profiler>=0.61,<1.0",
+]
+
+# Security scanning (optional)
+security = [
+  "safety>=3.0,<4.0",
+  "bandit>=1.7,<2.0",
 ]
 
 [build-system]
@@ -121,10 +132,14 @@ select = [
     "B",   # flake8-bugbear
     "A",   # flake8-builtins
     "C90", # mccabe complexity
+    "S",   # flake8-bandit (security)
+    "T20", # flake8-print
 ]
 ignore = [
     "E501",  # Line too long (handled by formatter)
     "B008",  # Do not perform function calls in argument defaults
+    "S101",  # Use of assert detected
+    "T201",  # print found (allow in notebooks and scripts)
 ]
 
 [tool.ruff.lint.mccabe]
@@ -178,7 +193,9 @@ module = [
     "matplotlib.*",
     "seaborn.*",
     "plotly.*",
-    "sklearn.*"
+    "sklearn.*",
+    "viztracer.*",
+    "memory_profiler.*"
 ]
 ignore_missing_imports = true
 
@@ -202,7 +219,8 @@ source = ["torch_starter"]
 omit = [
     "*/tests/*",
     "*/test_*",
-    "*/__pycache__/*"
+    "*/__pycache__/*",
+    "*/verify_setup/*"
 ]
 
 [tool.coverage.report]
@@ -214,17 +232,18 @@ exclude_lines = [
     "raise AssertionError",
     "raise NotImplementedError",
     "if 0:",
-    "if __name__ == .__main__.:"
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
 ]
 
-# UV configuration - performance optimized
+# UV configuration
 [tool.uv]
 index-strategy = "unsafe-best-match"
 resolution = "highest"
 compile-bytecode = true
 link-mode = "copy"
 
-# Primary index: PyPI
+# Primary index: PyPI (default)
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
@@ -234,14 +253,3 @@ default = true
 [[tool.uv.index]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu124"
-
-# Source routing for PyTorch packages
-[tool.uv.sources]
-torch = { index = "pytorch" }
-torchvision = { index = "pytorch" }  
-torchaudio = { index = "pytorch" }
-
-# Ensure critical packages come from PyPI
-requests = { index = "pypi" }
-numpy = { index = "pypi" }
-pandas = { index = "pypi" }

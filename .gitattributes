@@ -7,6 +7,11 @@
 *.toml text eol=lf
 *.json text eol=lf
 
+# Ensure shell scripts maintain executable permissions
+dev.sh text eol=lf
+verify_setup/*.sh text eol=lf
+scripts/*.sh text eol=lf
+
 # Binary files should not be modified
 *.png binary
 *.jpg binary
@@ -14,3 +19,21 @@
 *.gif binary
 *.ico binary
 *.pdf binary
+
+# Model files and weights
+*.pth binary
+*.pt binary
+*.ckpt binary
+*.safetensors binary
+*.bin binary
+
+# Archive files
+*.zip binary
+*.tar.gz binary
+*.tar.bz2 binary
+*.tar.xz binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Optimized developer helper script with performance improvements
+# Optimized developer helper script with performance improvements and security fixes
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
@@ -36,28 +36,45 @@ ensure_uv_and_python() {
   fi
   
   log_info "Setting up Python environment..."
-  uv python install 3.12
+  
+  # Check if Python 3.12 is available
+  if ! uv python list | grep -q "3.12"; then
+    log_info "Installing Python 3.12..."
+    uv python install 3.12 || {
+      log_error "Failed to install Python 3.12"
+      exit 1
+    }
+  fi
   
   if [[ ! -d "${ROOT_DIR}/.venv" ]]; then
     log_info "Creating virtual environment..."
-    uv venv "${ROOT_DIR}/.venv" -p 3.12
+    uv venv "${ROOT_DIR}/.venv" -p 3.12 || {
+      log_error "Failed to create virtual environment"
+      exit 1
+    }
   fi
   
   activate_venv
   log_info "Syncing dependencies..."
-  uv sync --compile-bytecode
+  uv sync --compile-bytecode || {
+    log_error "Failed to sync dependencies"
+    exit 1
+  }
   log_success "Environment setup complete"
 }
 
-# Performance-optimized commands
+# Performance-optimized commands with better error handling
 cmd_format() {
   log_info "Formatting code with ruff..."
   activate_venv
-  ruff format . --diff --check
-  if [[ $? -eq 0 ]]; then
+  
+  if ruff format . --diff --check >/dev/null 2>&1; then
     log_success "Code already formatted"
   else
-    ruff format .
+    ruff format . || {
+      log_error "Code formatting failed"
+      return 1
+    }
     log_success "Code formatted"
   fi
 }
@@ -65,55 +82,78 @@ cmd_format() {
 cmd_lint() {
   log_info "Running linter..."
   activate_venv
-  ruff check . --output-format=github
+  ruff check . --output-format=github || {
+    log_error "Linting found issues"
+    return 1
+  }
+  log_success "Linting passed"
 }
 
 cmd_lint_fix() {
   log_info "Auto-fixing lint issues..."
   activate_venv
-  ruff check --fix . --unsafe-fixes
-  ruff format .
-  log_success "Lint issues fixed"
+  ruff check --fix . --unsafe-fixes || log_warning "Some issues could not be auto-fixed"
+  ruff format . || log_warning "Formatting encountered issues"
+  log_success "Lint fixes applied"
 }
 
 cmd_fix_imports() {
   log_info "Fixing import order..."
   activate_venv
-  ruff check --select I --fix .
+  ruff check --select I --fix . || log_warning "Some imports could not be auto-fixed"
   log_success "Imports organized"
 }
 
 cmd_typecheck() {
   log_info "Type checking with mypy..."
   activate_venv
-  mypy . --show-error-codes --pretty
+  mypy . --show-error-codes --pretty || {
+    log_error "Type checking failed"
+    return 1
+  }
+  log_success "Type checking passed"
 }
 
 cmd_test() {
   log_info "Running tests..."
   activate_venv
-  pytest -xvs --tb=short --disable-warnings
+  pytest -xvs --tb=short --disable-warnings || {
+    log_error "Tests failed"
+    return 1
+  }
+  log_success "All tests passed"
 }
 
 cmd_test_cov() {
   log_info "Running tests with coverage..."
   activate_venv
-  pytest --cov=torch_starter --cov-report=html --cov-report=term-missing
+  pytest --cov=torch_starter --cov-report=html --cov-report=term-missing || {
+    log_error "Tests with coverage failed"
+    return 1
+  }
+  log_success "Tests with coverage completed"
 }
 
 cmd_all_checks() {
   log_info "Running all quality checks..."
   local start_time=$(date +%s)
+  local failed_checks=()
   
-  cmd_format
-  cmd_lint  
-  cmd_fix_imports
-  cmd_typecheck
-  cmd_test
+  cmd_format || failed_checks+=("format")
+  cmd_lint || failed_checks+=("lint")
+  cmd_fix_imports || failed_checks+=("imports")
+  cmd_typecheck || failed_checks+=("typecheck")
+  cmd_test || failed_checks+=("test")
   
   local end_time=$(date +%s)
   local duration=$((end_time - start_time))
-  log_success "All checks completed in ${duration}s"
+  
+  if [[ ${#failed_checks[@]} -eq 0 ]]; then
+    log_success "All checks completed successfully in ${duration}s"
+  else
+    log_error "Failed checks: ${failed_checks[*]} (completed in ${duration}s)"
+    return 1
+  fi
 }
 
 cmd_sync() {
@@ -124,15 +164,24 @@ cmd_sync() {
 cmd_sync_minimal() {
   log_info "Minimal dependency sync..."
   activate_venv
-  uv sync --no-dev --compile-bytecode
+  uv sync --no-dev --compile-bytecode || {
+    log_error "Minimal sync failed"
+    return 1
+  }
   log_success "Minimal sync complete"
 }
 
 cmd_lock_update() {
   log_info "Updating lock file..."
   activate_venv || true
-  uv lock --upgrade
-  uv sync --compile-bytecode
+  uv lock --upgrade || {
+    log_error "Lock file update failed"
+    return 1
+  }
+  uv sync --compile-bytecode || {
+    log_error "Sync after lock update failed"
+    return 1
+  }
   log_success "Dependencies updated and synced"
 }
 
@@ -149,7 +198,11 @@ cmd_clean() {
 
 cmd_verify_setup() {
   log_info "Verifying environment setup..."
-  bash "${ROOT_DIR}/verify_setup/verify_setup.sh" 2>/dev/null || {
+  if [[ -f "${ROOT_DIR}/verify_setup/verify_setup.sh" ]]; then
+    bash "${ROOT_DIR}/verify_setup/verify_setup.sh" || {
+      log_warning "Detailed verification encountered issues"
+    }
+  else
     log_warning "Verification script not found, running basic checks..."
     activate_venv
     python -c "
@@ -170,21 +223,27 @@ try:
     print(f'Transformers: {transformers.__version__}')
 except ImportError:
     print('Transformers not installed')
-"
+" || {
+      log_error "Basic verification failed"
+      return 1
+    }
     log_success "Basic verification complete"
-  }
+  fi
 }
 
 cmd_setup_keys() {
   if [[ -f "${ROOT_DIR}/verify_setup/setup_api_keys.sh" ]]; then
-    bash "${ROOT_DIR}/verify_setup/setup_api_keys.sh"
+    bash "${ROOT_DIR}/verify_setup/setup_api_keys.sh" || {
+      log_warning "API key setup encountered issues"
+    }
   else
     log_warning "API key setup script not found"
     log_info "Create .env.local file manually with your API keys"
+    log_info "See .env.example for template"
   fi
 }
 
-# Optimized package management
+# Optimized package management with better error handling
 cmd_add_temp() {
   local package="${1:-}"
   if [[ -z "$package" ]]; then
@@ -194,7 +253,10 @@ cmd_add_temp() {
   
   log_info "Adding temporary package: $package"
   activate_venv
-  uv add "$package" --compile-bytecode
+  uv add "$package" --compile-bytecode || {
+    log_error "Failed to add package: $package"
+    return 1
+  }
   log_success "Package '$package' added (temporary until container rebuild)"
 }
 
@@ -208,12 +270,21 @@ cmd_add_perm() {
   log_info "Adding permanent package: $package"
   
   # Backup pyproject.toml
-  cp pyproject.toml pyproject.toml.bak
+  cp pyproject.toml pyproject.toml.bak || {
+    log_error "Failed to backup pyproject.toml"
+    return 1
+  }
   
   # Add to dependencies using uv
   activate_venv 2>/dev/null || true
-  uv add "$package"
+  uv add "$package" || {
+    log_error "Failed to add package: $package"
+    log_info "Restoring backup..."
+    mv pyproject.toml.bak pyproject.toml
+    return 1
+  }
   
+  rm pyproject.toml.bak
   log_success "Package '$package' added to pyproject.toml"
   log_warning "Container rebuild required for team sync"
 }
@@ -227,7 +298,10 @@ cmd_remove() {
   
   log_info "Removing package: $package"
   activate_venv
-  uv remove "$package"
+  uv remove "$package" || {
+    log_error "Failed to remove package: $package"
+    return 1
+  }
   log_success "Package '$package' removed"
 }
 
@@ -251,7 +325,10 @@ cmd_rebuild_image() {
 cmd_sync_temp() {
   log_info "Syncing temporary packages..."
   activate_venv
-  uv sync --no-install-project --compile-bytecode
+  uv sync --no-install-project --compile-bytecode || {
+    log_error "Temporary package sync failed"
+    return 1
+  }
   log_success "Temporary packages synced"
 }
 
@@ -263,14 +340,25 @@ cmd_profile() {
     exit 1
   fi
   
+  if [[ ! -f "$script" ]]; then
+    log_error "Script not found: $script"
+    return 1
+  fi
+  
   log_info "Profiling $script with viztracer..."
   activate_venv
   if ! python -c "import viztracer" 2>/dev/null; then
     log_warning "Installing viztracer temporarily..."
-    uv add viztracer --compile-bytecode
+    uv add viztracer --compile-bytecode || {
+      log_error "Failed to install viztracer"
+      return 1
+    }
   fi
   
-  viztracer --tracer_entries 1000000 "$script"
+  viztracer --tracer_entries 1000000 "$script" || {
+    log_error "Profiling failed"
+    return 1
+  }
   log_success "Profile saved to result.html"
 }
 
@@ -281,17 +369,28 @@ cmd_memory_profile() {
     exit 1
   fi
   
+  if [[ ! -f "$script" ]]; then
+    log_error "Script not found: $script"
+    return 1
+  fi
+  
   log_info "Memory profiling $script..."
   activate_venv
   if ! python -c "import memory_profiler" 2>/dev/null; then
     log_warning "Installing memory-profiler temporarily..."
-    uv add memory-profiler --compile-bytecode
+    uv add memory-profiler --compile-bytecode || {
+      log_error "Failed to install memory-profiler"
+      return 1
+    }
   fi
   
-  python -m memory_profiler "$script"
+  python -m memory_profiler "$script" || {
+    log_error "Memory profiling failed"
+    return 1
+  }
 }
 
-# Jupyter and notebook management
+# SECURITY FIX: Secure Jupyter configuration
 cmd_jupyter() {
   log_info "Starting Jupyter Lab..."
   activate_venv
@@ -299,16 +398,32 @@ cmd_jupyter() {
   # Check if jupyterlab is available
   if ! python -c "import jupyterlab" 2>/dev/null; then
     log_warning "JupyterLab not found, installing temporarily..."
-    uv add jupyterlab --compile-bytecode
+    uv add jupyterlab --compile-bytecode || {
+      log_error "Failed to install JupyterLab"
+      return 1
+    }
   fi
+  
+  # Generate a secure token if none exists
+  if [[ -z "${JUPYTER_TOKEN:-}" ]]; then
+    JUPYTER_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+  fi
+  
+  echo ""
+  log_success "🔐 Jupyter Lab will be available at:"
+  echo "   http://localhost:8888/lab?token=${JUPYTER_TOKEN}"
+  echo ""
+  log_info "Starting Jupyter Lab with secure token..."
   
   jupyter lab \
     --ip=0.0.0.0 \
     --port=8888 \
     --no-browser \
     --allow-root \
-    --NotebookApp.token='' \
-    --NotebookApp.password=''
+    --ServerApp.token="${JUPYTER_TOKEN}" \
+    --ServerApp.password='' \
+    --ServerApp.open_browser=False \
+    --ServerApp.allow_remote_access=True
 }
 
 cmd_notebook() {
@@ -316,28 +431,48 @@ cmd_notebook() {
   activate_venv
   
   if ! python -c "import notebook" 2>/dev/null; then
-    uv add notebook --compile-bytecode
+    log_warning "Installing Jupyter Notebook temporarily..."
+    uv add notebook --compile-bytecode || {
+      log_error "Failed to install Jupyter Notebook"
+      return 1
+    }
   fi
+  
+  # Generate a secure token if none exists
+  if [[ -z "${JUPYTER_TOKEN:-}" ]]; then
+    JUPYTER_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+  fi
+  
+  echo ""
+  log_success "🔐 Jupyter Notebook will be available at:"
+  echo "   http://localhost:8888/?token=${JUPYTER_TOKEN}"
+  echo ""
+  log_info "Starting Jupyter Notebook with secure token..."
   
   jupyter notebook \
     --ip=0.0.0.0 \
     --port=8888 \
     --no-browser \
     --allow-root \
-    --NotebookApp.token='' \
-    --NotebookApp.password=''
+    --NotebookApp.token="${JUPYTER_TOKEN}" \
+    --NotebookApp.password='' \
+    --NotebookApp.open_browser=False \
+    --NotebookApp.allow_remote_access=True
 }
 
 # Docker and container management
 cmd_docker_stats() {
   log_info "Container resource usage:"
-  docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
+  docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}" || {
+    log_error "Failed to get Docker stats"
+    return 1
+  }
 }
 
 cmd_docker_cleanup() {
   log_info "Cleaning up Docker resources..."
-  docker system prune -f
-  docker volume prune -f
+  docker system prune -f || log_warning "Docker system prune failed"
+  docker volume prune -f || log_warning "Docker volume prune failed"
   log_success "Docker cleanup complete"
 }
 
@@ -356,7 +491,7 @@ cmd_optimize() {
   uv cache clean 2>/dev/null || true
   
   # Remove unused packages
-  uv sync --compile-bytecode
+  uv sync --compile-bytecode || log_warning "Sync during optimization failed"
   
   log_success "Environment optimized"
 }
@@ -367,24 +502,37 @@ cmd_install_hooks() {
   activate_venv
   
   if ! command -v pre-commit &>/dev/null; then
-    uv add pre-commit --compile-bytecode
+    log_info "Installing pre-commit..."
+    uv add pre-commit --compile-bytecode || {
+      log_error "Failed to install pre-commit"
+      return 1
+    }
   fi
   
-  pre-commit install
+  pre-commit install || {
+    log_error "Failed to install pre-commit hooks"
+    return 1
+  }
   log_success "Pre-commit hooks installed"
 }
 
 cmd_run_hooks() {
   log_info "Running pre-commit hooks on all files..."
   activate_venv
-  pre-commit run --all-files
+  pre-commit run --all-files || {
+    log_error "Pre-commit hooks failed"
+    return 1
+  }
 }
 
 # Dependency analysis
 cmd_deps_tree() {
   log_info "Dependency tree:"
   activate_venv
-  uv tree
+  uv tree || {
+    log_error "Failed to show dependency tree"
+    return 1
+  }
 }
 
 cmd_deps_outdated() {
@@ -401,10 +549,17 @@ cmd_security() {
   
   if ! python -c "import safety" 2>/dev/null; then
     log_warning "Installing safety temporarily..."
-    uv add safety --compile-bytecode
+    uv add safety --compile-bytecode || {
+      log_error "Failed to install safety"
+      return 1
+    }
   fi
   
-  safety check
+  safety check || {
+    log_warning "Security scan found issues"
+    return 1
+  }
+  log_success "Security scan completed"
 }
 
 # Benchmarking
@@ -414,48 +569,56 @@ cmd_benchmark() {
   
   python -c "
 import time
-import torch
-import numpy as np
-
-print('🔥 Environment Benchmark')
-print('=' * 40)
-
-# Python performance
-start = time.time()
-_ = [i**2 for i in range(100000)]
-python_time = time.time() - start
-print(f'Python compute: {python_time:.3f}s')
-
-# NumPy performance
-start = time.time()
-arr = np.random.randn(1000, 1000)
-_ = np.dot(arr, arr)
-numpy_time = time.time() - start
-print(f'NumPy matmul: {numpy_time:.3f}s')
-
-# PyTorch CPU performance
-start = time.time()
-tensor = torch.randn(1000, 1000)
-_ = torch.mm(tensor, tensor)
-torch_cpu_time = time.time() - start
-print(f'PyTorch CPU: {torch_cpu_time:.3f}s')
-
-# PyTorch GPU performance (if available)
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-    tensor = torch.randn(1000, 1000, device=device)
-    torch.cuda.synchronize()
+import sys
+try:
+    import torch
+    import numpy as np
+    
+    print('🔥 Environment Benchmark')
+    print('=' * 40)
+    
+    # Python performance
     start = time.time()
+    _ = [i**2 for i in range(100000)]
+    python_time = time.time() - start
+    print(f'Python compute: {python_time:.3f}s')
+    
+    # NumPy performance
+    start = time.time()
+    arr = np.random.randn(1000, 1000)
+    _ = np.dot(arr, arr)
+    numpy_time = time.time() - start
+    print(f'NumPy matmul: {numpy_time:.3f}s')
+    
+    # PyTorch CPU performance
+    start = time.time()
+    tensor = torch.randn(1000, 1000)
     _ = torch.mm(tensor, tensor)
-    torch.cuda.synchronize()
-    torch_gpu_time = time.time() - start
-    print(f'PyTorch GPU: {torch_gpu_time:.3f}s')
-    print(f'GPU speedup: {torch_cpu_time/torch_gpu_time:.1f}x')
-else:
-    print('CUDA not available')
-
-print('=' * 40)
-"
+    torch_cpu_time = time.time() - start
+    print(f'PyTorch CPU: {torch_cpu_time:.3f}s')
+    
+    # PyTorch GPU performance (if available)
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        tensor = torch.randn(1000, 1000, device=device)
+        torch.cuda.synchronize()
+        start = time.time()
+        _ = torch.mm(tensor, tensor)
+        torch.cuda.synchronize()
+        torch_gpu_time = time.time() - start
+        print(f'PyTorch GPU: {torch_gpu_time:.3f}s')
+        print(f'GPU speedup: {torch_cpu_time/torch_gpu_time:.1f}x')
+    else:
+        print('CUDA not available')
+    
+    print('=' * 40)
+except ImportError as e:
+    print(f'Benchmark failed: {e}')
+    sys.exit(1)
+" || {
+    log_error "Benchmark failed"
+    return 1
+  }
 }
 
 # Help and usage
@@ -491,8 +654,8 @@ PACKAGE MANAGEMENT:
   lock-update        Update lock file and sync
 
 JUPYTER & NOTEBOOKS:
-  jupyter            Start Jupyter Lab
-  notebook           Start Jupyter Notebook
+  jupyter            Start Jupyter Lab (with secure token)
+  notebook           Start Jupyter Notebook (with secure token)
 
 PERFORMANCE & DEBUGGING:
   profile <script>   Profile script with viztracer
@@ -514,20 +677,29 @@ EXAMPLES:
   ./dev.sh add-temp wandb && ./dev.sh jupyter
   ./dev.sh profile scripts/train.py
   ./dev.sh benchmark
+
+SECURITY NOTES:
+  - Jupyter now uses secure tokens by default
+  - API keys should be stored in .env.local (see .env.example)
 USAGE
 }
 
 # Performance timer wrapper
 time_command() {
   local cmd="$1"
-  local start_time=$(date +%s.%N)
+  local start_time=$(date +%s.%N 2>/dev/null || date +%s)
   
   shift
   "$cmd" "$@"
   local exit_code=$?
   
-  local end_time=$(date +%s.%N)
-  local duration=$(echo "$end_time - $start_time" | bc -l 2>/dev/null || echo "0")
+  local end_time=$(date +%s.%N 2>/dev/null || date +%s)
+  local duration
+  if command -v bc >/dev/null 2>&1; then
+    duration=$(echo "$end_time - $start_time" | bc -l 2>/dev/null || echo "0")
+  else
+    duration=$(( end_time - start_time ))
+  fi
   
   if [[ $exit_code -eq 0 ]]; then
     log_success "Command completed in ${duration}s"
@@ -538,13 +710,26 @@ time_command() {
   return $exit_code
 }
 
-# Main command dispatcher
+# Main command dispatcher with better error handling
 main() {
   local cmd="${1:-}"
   
+  # Validate command exists
+  case "$cmd" in
+    sync|sync-minimal|format|lint|lint-fix|fix-imports|typecheck|test|test-cov|all-checks|lock-update|clean|verify-setup|setup-keys|add-temp|add-perm|remove|rebuild-image|sync-temp|profile|memory-profile|jupyter|notebook|docker-stats|docker-cleanup|optimize|install-hooks|run-hooks|deps-tree|deps-outdated|security|benchmark|""|help|-h|--help)
+      # Valid command, continue
+      ;;
+    *)
+      log_error "Unknown command: $cmd"
+      echo ""
+      usage
+      exit 1
+      ;;
+  esac
+  
   # Add timing to long-running commands
   case "$cmd" in
-    sync|all-checks|test|typecheck|lock-update)
+    sync|all-checks|test|typecheck|lock-update|benchmark)
       time_command "cmd_$cmd" "${@:2}"
       ;;
     sync-minimal) cmd_sync_minimal ;;
@@ -579,12 +764,6 @@ main() {
     security) cmd_security ;;
     benchmark) cmd_benchmark ;;
     ""|help|-h|--help) usage ;;
-    *) 
-      log_error "Unknown command: $cmd"
-      echo ""
-      usage
-      exit 1
-      ;;
   esac
 }
 
