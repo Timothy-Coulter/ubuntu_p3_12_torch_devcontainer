@@ -207,10 +207,13 @@ cmd_test_cov() {
   log_success "Tests with coverage completed"
 }
 
-cmd_all-checks() {
+cmd_all_checks() {
   log_info "Running all quality checks..."
   local start_time=$(date +%s)
   local failed_checks=()
+  
+  # Ensure environment is set up first
+  ensure_uv_and_python
   
   cmd_format || failed_checks+=("format")
   cmd_lint || failed_checks+=("lint")
