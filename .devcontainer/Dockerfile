@@ -186,7 +186,7 @@ RUN . .venv/bin/activate && \
 EXPOSE 8888 8000 6006 7860
 
 # Comprehensive health check that verifies CUDA functionality
-HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=300s --timeout=10s --start-period=30s --retries=3 \
     CMD . .venv/bin/activate && python -c " \
     import torch; \
     print(f'Health check: PyTorch {torch.__version__}'); \
