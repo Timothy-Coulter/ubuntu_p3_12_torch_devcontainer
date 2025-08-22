@@ -2,7 +2,6 @@
 name = "torch-starter"
 version = "0.1.0"
 description = "Optimized Deep Learning starter template with uv, CUDA 12.4 PyTorch, and VS Code Dev Containers."
-readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }
 authors = [{ name = "Your Name" }]
