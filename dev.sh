@@ -63,6 +63,35 @@ ensure_uv_and_python() {
   log_success "Environment setup complete"
  
 # CUDA version management
+
+check_cuda_compatibility() {
+    local pytorch_cuda_version
+    pytorch_cuda_version=$(python -c "import torch; print(torch.version.cuda)" 2>/dev/null || echo "none")
+    
+    if [[ "$pytorch_cuda_version" == "none" ]]; then
+        fail "PyTorch was not compiled with CUDA support"
+        info "Reinstall with: uv sync --extra torch-cu124"
+        return 1
+    fi
+    
+    # Check actual CUDA runtime version
+    local runtime_version
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        runtime_version=$(nvidia-smi --query-gpu=cuda_version --format=csv,noheader,nounits | head -1)
+        info "NVIDIA Runtime CUDA version: $runtime_version"
+    fi
+    
+    info "PyTorch CUDA version: $pytorch_cuda_version"
+    
+    # More flexible version checking
+    local pytorch_major=$(echo "$pytorch_cuda_version" | cut -d. -f1)
+    if [[ "$pytorch_major" == "12" ]]; then
+        pass "PyTorch CUDA 12.x compatibility confirmed"
+    else
+        warn "Unexpected PyTorch CUDA version: $pytorch_cuda_version"
+    fi
+}
+
 get_cuda_version() {
   if [[ -n "${CUDA_VERSION:-}" ]]; then
     echo "${CUDA_VERSION}"
