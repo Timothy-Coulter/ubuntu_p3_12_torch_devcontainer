@@ -1,5 +1,5 @@
 {
-    "name": "torch_starter (CUDA 13.0, uv, Py3.12)",
+    "name": "torch_starter-optimized (CUDA 13.0, uv, Py3.12)",
     "build": {
         "dockerfile": "Dockerfile",
         "context": "..",
@@ -34,8 +34,10 @@
         "UV_COMPILE_BYTECODE": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
         "CUDA_VISIBLE_DEVICES": "all",
+        // Critical CUDA environment variables
         "NVIDIA_VISIBLE_DEVICES": "all",
         "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+        // Fixed CUDA 13.0 paths
         "LD_LIBRARY_PATH": "/usr/local/cuda-13.0/lib64:${LD_LIBRARY_PATH}",
         "CUDA_HOME": "/usr/local/cuda-13.0"
     },
@@ -64,12 +66,19 @@
             "source": "torch-starter-uv-cache",
             "target": "/home/vscode/.cache/uv",
             "type": "volume"
+        },
+        // Mount .env.local if it exists on host
+        {
+            "source": "${localWorkspaceFolder}/.env.local",
+            "target": "/workspaces/${localWorkspaceFolderBasename}/.env.local",
+            "type": "bind",
+            "consistency": "cached"
         }
     ],
     "initializeCommand": [
         "bash",
         "-c",
-        "echo 'Creating Docker volumes...'; docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true; echo 'Docker volumes created successfully'"
+        "docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true; touch .env.local 2>/dev/null || true"
     ],
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {
@@ -79,11 +88,13 @@
             "ppa": false,
             "version": "os-provided"
         }
+        // CUDA toolkit included in base image - no additional feature needed
     },
     "postCreateCommand": {
+        "activate-env": "bash -c 'source .venv/bin/activate && python -c \"import torch; print(f\\\"🚀 Environment ready! CUDA: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}\\\")\"'",
         "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}",
-        "setup-env": "echo 'Container setup completed successfully'",
-        "validate-env": "bash -c 'source .venv/bin/activate && python -c \"import torch; print(f\\\"🚀 Debug Environment ready! CUDA: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}\\\")\" || echo \"⚠️  PyTorch validation failed - this may be expected without GPU access\"'"
+        // Automatically create .env.local if it doesn't exist
+        "setup-env": "bash -c '[ ! -f .env.local ] && cp templates/env.local .env.local && chmod 600 .env.local && echo \"📝 Created .env.local from template\" || echo \"✓ .env.local already exists\"'"
     },
     "customizations": {
         "vscode": {
@@ -94,24 +105,33 @@
                 "charliermarsh.ruff",
                 "eamodio.gitlens",
                 "EditorConfig.EditorConfig",
-                "ms-azuretools.vscode-docker"
+                "ms-azuretools.vscode-docker",
+                "RooVeterinaryInc.roo-cline",
+                "mechatroner.rainbow-csv",
+                "gaogaotiantian.viztracer-vscode",
+                "bierner.markdown-mermaid",
+                "github.vscode-github-actions"
             ],
             "settings": {
+                // Python settings
                 "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python",
                 "python.terminal.activateEnvironment": true,
                 "python.analysis.typeCheckingMode": "basic",
                 "python.analysis.autoImportCompletions": true,
                 "python.analysis.indexing": true,
+                // Testing
                 "python.testing.pytestEnabled": true,
                 "python.testing.unittestEnabled": false,
                 "python.testing.pytestArgs": [
                     "tests"
                 ],
+                // Ruff configuration  
                 "ruff.enable": true,
                 "ruff.organizeImports": true,
                 "ruff.serverEnabled": true,
                 "ruff.lint.enable": true,
                 "ruff.format.enable": true,
+                // Editor performance
                 "files.watcherExclude": {
                     "**/.venv/**": true,
                     "**/__pycache__/**": true,
@@ -133,12 +153,16 @@
                     "**/.ruff_cache": true,
                     "**/.pytest_cache": true
                 },
+                // Terminal settings
                 "terminal.integrated.defaultProfile.linux": "zsh",
                 "terminal.integrated.shellIntegration.enabled": true,
+                // Jupyter settings
                 "jupyter.askForKernelRestart": false,
                 "notebook.experimental.openGettingStarted": false,
+                // Git settings
                 "git.enableSmartCommit": true,
                 "git.autofetch": true,
+                // Performance settings
                 "extensions.autoUpdate": false,
                 "telemetry.telemetryLevel": "off"
             }
