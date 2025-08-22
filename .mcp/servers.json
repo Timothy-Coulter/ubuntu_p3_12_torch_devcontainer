@@ -1,3 +1,7 @@
 {
-    "servers": []
+    "servers": {
+        "safety-mcp": {
+            "url": "https://mcp.safetycli.com/sse?api-key=9ed207fa-235d-4994-8f0b-a6fa81422541"
+        }
+    }
 }

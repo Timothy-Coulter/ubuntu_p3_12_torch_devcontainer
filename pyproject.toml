@@ -41,6 +41,10 @@ dependencies = [
   "python-dotenv>=1.0,<2.0",
   "memory-profiler>=0.61.0",
   "safety>=3.6.0",
+  "ruff>=0.12.8",
+  "mypy>=1.17.1",
+  "pytest>=8.4.1",
+  "pytest-cov>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -246,11 +250,17 @@ link-mode = "copy"
 
 # Primary index: PyPI (default)
 [[tool.uv.index]]
+name = "safety"
+url = "https://pkgs.safetycli.com/repository/freelance-ad16e/project/ubuntu-p3-12-torch-devcontainer/pypi/simple/"
+default = false
+
+[[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
 default = true
 
 # Secondary index: PyTorch CUDA wheels
+
 [[tool.uv.index]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu130"

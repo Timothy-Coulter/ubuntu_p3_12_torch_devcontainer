@@ -134,7 +134,7 @@ cmd_test_cov() {
   log_success "Tests with coverage completed"
 }
 
-cmd_all_checks() {
+cmd_all-checks() {
   log_info "Running all quality checks..."
   local start_time=$(date +%s)
   local failed_checks=()
@@ -554,7 +554,7 @@ cmd_security() {
     }
   fi
   
-  safety check || {
+  safety scan || {
     log_warning "Security scan found issues"
     return 1
   }

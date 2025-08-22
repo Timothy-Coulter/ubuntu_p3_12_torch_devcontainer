@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Multi-stage build for better caching and smaller final image
-FROM mcr.microsoft.com/vscode/devcontainers/cuda:13.0-devel-ubuntu24.04 AS base-deps
+FROM mcr.microsoft.com/vscode/devcontainers/base:ubuntu-24.04 AS base-deps
 
 # Build arguments for cache control
 ARG BUILDKIT_INLINE_CACHE=1
