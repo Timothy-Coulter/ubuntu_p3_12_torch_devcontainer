@@ -40,11 +40,12 @@ dependencies = [
   # Environment management
   "python-dotenv>=1.0,<2.0",
   "memory-profiler>=0.61.0",
+  "safety>=3.6.0",
 ]
 
 [project.optional-dependencies]
 # PyTorch with CUDA - separate for flexibility
-torch-cu124 = [
+torch-cu130 = [
   "torch>=2.0,<3.0",
   "torchvision>=0.15,<1.0",
   "torchaudio>=2.0,<3.0"
@@ -252,4 +253,4 @@ default = true
 # Secondary index: PyTorch CUDA wheels
 [[tool.uv.index]]
 name = "pytorch"
-url = "https://download.pytorch.org/whl/cu124"
+url = "https://download.pytorch.org/whl/cu130"

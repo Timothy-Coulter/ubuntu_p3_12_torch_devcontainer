@@ -1,14 +1,16 @@
 # syntax=docker/dockerfile:1.7
 
 # Multi-stage build for better caching and smaller final image
-FROM mcr.microsoft.com/vscode/devcontainers/base:ubuntu-24.04 AS base-deps
+FROM mcr.microsoft.com/vscode/devcontainers/cuda:13.0-devel-ubuntu24.04 AS base-deps
 
 # Build arguments for cache control
 ARG BUILDKIT_INLINE_CACHE=1
 ARG PYTHON_VERSION=3.12
+ARG CUDA_VERSION=13.0
 
 # Environment setup - consolidated for better layer caching
 ENV DEBIAN_FRONTEND=noninteractive \
+    CUDA_VERSION=${CUDA_VERSION} \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
@@ -85,7 +87,7 @@ RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
     --index-strategy unsafe-best-match \
     --extra dev \
     --extra notebook \
-    --extra torch-cu124 \
+    --extra torch-cu130 \
     --compile-bytecode \
     && echo "External dependencies installed"
 

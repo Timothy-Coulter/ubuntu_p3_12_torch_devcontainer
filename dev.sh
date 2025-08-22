@@ -390,7 +390,6 @@ cmd_memory_profile() {
   }
 }
 
-# SECURITY FIX: Secure Jupyter configuration
 cmd_jupyter() {
   log_info "Starting Jupyter Lab..."
   activate_venv
