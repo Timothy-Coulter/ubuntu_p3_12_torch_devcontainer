@@ -31,6 +31,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     openssh-client tini \
     # Performance tools
     htop iotop \
+    bc \
     # Cleanup in same layer
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install --system
@@ -80,12 +81,12 @@ RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
     uv venv --clear .venv -p ${PYTHON_VERSION} \
     && . .venv/bin/activate \
     && uv sync \
-        --no-install-project \
-        --index-strategy unsafe-best-match \
-        --extra dev \
-        --extra notebook \
-        --extra torch-cu124 \
-        --compile-bytecode \
+    --no-install-project \
+    --index-strategy unsafe-best-match \
+    --extra dev \
+    --extra notebook \
+    --extra torch-cu124 \
+    --compile-bytecode \
     && echo "External dependencies installed"
 
 # Final stage - minimal layers for runtime
@@ -98,8 +99,8 @@ COPY --chown=${APP_USER}:${APP_USER} . .
 RUN . .venv/bin/activate \
     && uv pip install -e . --compile-bytecode \
     && python -m ipykernel install --user \
-        --name torch_starter-${PYTHON_VERSION} \
-        --display-name "Python ${PYTHON_VERSION} (torch_starter)" \
+    --name torch_starter-${PYTHON_VERSION} \
+    --display-name "Python ${PYTHON_VERSION} (torch_starter)" \
     && echo "Project setup completed"
 
 # Quick validation (non-blocking)

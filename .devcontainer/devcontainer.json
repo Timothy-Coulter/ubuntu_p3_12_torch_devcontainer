@@ -77,18 +77,17 @@
     "customizations": {
         "vscode": {
             "extensions": [
-                // Core Python (essential)
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ms-toolsai.jupyter",
-                // Code quality (essential)
                 "charliermarsh.ruff",
-                // Development tools (useful)
                 "eamodio.gitlens",
                 "EditorConfig.EditorConfig",
-                // Optional - remove if not needed
                 "ms-azuretools.vscode-docker",
-                "redhat.vscode-yaml"
+                "RooVeterinaryInc.roo-cline",
+                "mechatroner.rainbow-csv",
+                "gaogaotiantian.viztracer-vscode",
+                "bierner.markdown-mermaid"
             ],
             "settings": {
                 // Python settings
