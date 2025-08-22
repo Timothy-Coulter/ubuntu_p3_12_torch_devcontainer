@@ -101,13 +101,6 @@ torch-cu126 = [
   "torchaudio>=2.6.0",
 ]
 
-# CPU-only PyTorch (for compatibility)
-torch-cpu = [
-  "torch>=2.5.0+cpu",
-  "torchvision>=0.21.0+cpu",
-  "torchaudio>=2.6.0+cpu",
-]
-
 [build-system]
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"

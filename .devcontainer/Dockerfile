@@ -1,10 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-# Multi-stage build for better caching and smaller final image
-# Using NVIDIA CUDA 12.6 base image with cuDNN runtime pre-installed
 FROM nvidia/cuda:12.6.0-cudnn-runtime-ubuntu24.04 AS base-deps
-
-# Build arguments for cache control
 ARG BUILDKIT_INLINE_CACHE=1
 ARG PYTHON_VERSION=3.12
 ARG TORCH_CUDA_EXTRA=torch-cu126
@@ -47,35 +43,27 @@ ENV CUDA_HOME=/usr/local/cuda-12.6 \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# Install uv
+# Install uv - the installer puts it in /usr/local/bin
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && /root/.cargo/bin/uv --version
-
-# Add uv to PATH
-ENV PATH="/root/.cargo/bin:${PATH}"
+    && uv --version
 
 # User setup
-ARG APP_USER=vscode
+ARG APP_USER=ubuntu
 ENV HOME=/home/${APP_USER}
 
-# Create all directories in single layer
+# Create user and directories - use existing ubuntu user
 RUN mkdir -p \
     ${HOME}/.cache/huggingface \
     ${HOME}/.cache/torch \
     ${HOME}/.cache/uv \
     ${HOME}/.kaggle \
     /workspaces/data \
-    && useradd -m -s /bin/zsh -u 1000 ${APP_USER} \
     && chown -R ${APP_USER}:${APP_USER} ${HOME} /workspaces \
-    && usermod -aG sudo ${APP_USER} \
-    && echo "${APP_USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+    && chmod -R 775 ${HOME}/.cache
 
 # Switch to user early
 USER ${APP_USER}
 WORKDIR /workspaces
-
-# Ensure uv is available for the user
-ENV PATH="/home/${APP_USER}/.cargo/bin:${PATH}"
 
 # Python environment setup stage
 FROM base-deps AS python-env
@@ -85,9 +73,8 @@ ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=automatic
 
-# Install Python with cache
-RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
-    uv python install ${PYTHON_VERSION}
+# Install Python without cache mount
+RUN uv python install ${PYTHON_VERSION}
 
 # Dependency installation stage
 FROM python-env AS deps-install
@@ -95,9 +82,8 @@ FROM python-env AS deps-install
 # Copy dependency files first (better caching)
 COPY --chown=${APP_USER}:${APP_USER} pyproject.toml uv.lock ./
 
-# Create venv and install dependencies with cache mounting
-RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
-    uv venv --clear .venv -p ${PYTHON_VERSION} \
+# Create venv and install dependencies without cache mount
+RUN uv venv --clear .venv -p ${PYTHON_VERSION} \
     && . .venv/bin/activate \
     && uv sync \
     --no-install-project \
@@ -110,6 +96,9 @@ RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000 \
 
 # Final stage - minimal layers for runtime
 FROM deps-install AS final
+
+# Ensure we're running as ubuntu user
+USER ${APP_USER}
 
 # Copy source code (separate layer for development)
 COPY --chown=${APP_USER}:${APP_USER} . .
