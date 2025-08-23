@@ -1,14 +1,14 @@
 [project]
 name = "torch-starter"
 version = "0.1.0"
-description = "CUDA-enabled PyTorch deep learning development environment with uv and VS Code Dev Containers (uses host CUDA libraries)."
+description = "CUDA-enabled PyTorch deep learning development environment with uv and VS Code Dev Containers (uses CUDA 12.1 PyTorch wheels)."
 requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }
 authors = [{ name = "Your Name", email = "your.email@domain.com" }]
 maintainers = [{ name = "Your Name", email = "your.email@domain.com" }]
 keywords = ["deep-learning", "pytorch", "transformers", "cuda", "gpu", "uv", "devcontainer"]
 
-# Core dependencies
+# Core dependencies - PyTorch CUDA wheels installed separately in Dockerfile
 dependencies = [
   "numpy>=1.26,<2.1",
   "pandas>=2.2,<2.3",
@@ -16,26 +16,38 @@ dependencies = [
   "scikit-learn>=1.4,<1.6",
   "tqdm>=4.66,<5.0",
 
-  # PyTorch (CPU wheel, links to preinstalled CUDA at runtime)
-  "torch",
+  # Note: PyTorch CUDA wheels installed via extra-index-url in Dockerfile
+  # "torch", "torchvision", "torchaudio" - installed with CUDA support
 
-  "transformers>=4.44,<4.46",
+  # Hugging Face ecosystem
+  "transformers>=4.44,<5.0",
   "datasets>=2.19,<3.1",
   "accelerate>=0.33,<1.0",
   "safetensors>=0.4.2,<1.0",
   "sentencepiece>=0.2,<1.0",
   "tokenizers>=0.19,<1.0",
+  
+  # Image processing
   "pillow>=10.0,<11.0",
   "albumentations>=1.4,<2.0",
+  
+  # Visualization
   "matplotlib>=3.8,<3.10",
+  
+  # Jupyter and interactive development
   "jupyter>=1.0,<2.0",
   "ipykernel>=6.29,<7.0",
   "ipywidgets>=8.1,<9.0",
+  
+  # Configuration and utilities
   "pyyaml>=6.0,<7.0",
   "requests>=2.32,<3.0",
   "python-dotenv>=1.0,<2.0",
   "rich>=13.7,<14.0",
   "typer>=0.12,<1.0",
+  
+  # GPU monitoring and utilities
+  "nvidia-ml-py>=12.0,<13.0",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +64,7 @@ dev = [
   "pytest-mock>=3.14,<4.0",
   "pytest-asyncio>=0.23,<1.0",
   "pytest-xdist>=3.6,<4.0",  # Parallel testing
+  "pytest-gpu>=1.2,<2.0",     # GPU-specific testing
   
   # Type stubs for better type checking
   "types-requests>=2.32,<3.0",
@@ -99,10 +112,12 @@ notebook = [
   "jupyterlab-git>=0.50,<1.0",
   "nbconvert>=7.16,<8.0",
   "nbformat>=5.10,<6.0",
+  "jupyterlab-nvdashboard>=0.10,<1.0",  # GPU monitoring in Jupyter
   
   # Interactive widgets and visualization
   "ipympl>=0.9,<1.0",
   "plotly>=5.22,<6.0",
+  "panel>=1.4,<2.0",
 ]
 
 # Experiment tracking and MLOps
@@ -110,6 +125,7 @@ tracking = [
   "tensorboard>=2.17,<3.0",
   "wandb>=0.17,<1.0",
   "mlflow>=2.15,<3.0",
+  "clearml>=1.16,<2.0",
   
   # Model versioning and management
   "dvc>=3.50,<4.0",
@@ -138,10 +154,12 @@ profiling = [
   "memory-profiler>=0.61,<1.0",
   "py-spy>=0.3,<1.0",
   "line-profiler>=4.1,<5.0",
+  "nvitop>=1.3,<2.0",           # Advanced GPU monitoring
   
   # GPU profiling
   "torch-tb-profiler>=0.4,<1.0",
   "nvidia-ml-py>=12.0,<13.0",
+  "pynvml>=11.5,<12.0",
 ]
 
 # Security scanning and code analysis
@@ -165,17 +183,40 @@ nlp = [
   "nltk>=3.9,<4.0",
   "gensim>=4.3,<5.0",
   "textblob>=0.18,<1.0",
+  "sentence-transformers>=2.7,<3.0",
+  "ftfy>=6.2,<7.0",
 ]
 
 # Computer vision extensions
 cv = [
   "ultralytics>=8.2,<9.0",
   "timm>=1.0,<2.0",
+  "detectron2 @ git+https://github.com/facebookresearch/detectron2.git",
+  "mmcv>=2.1,<3.0",
+  "supervision>=0.21,<1.0",
+]
+
+# Reinforcement Learning
+rl = [
+  "gymnasium>=0.29,<1.0",
+  "stable-baselines3>=2.3,<3.0",
+  "sb3-contrib>=2.3,<3.0",
+  "tensorboard>=2.17,<3.0",
+]
+
+# Large Language Models and Text Generation
+llm = [
+  "openai>=1.40,<2.0",
+  "anthropic>=0.34,<1.0",
+  "langchain>=0.2,<1.0",
+  "langchain-community>=0.2,<1.0",
+  "chromadb>=0.5,<1.0",
+  "faiss-gpu>=1.7,<2.0",
 ]
 
 # All extras combined for comprehensive installation
 all = [
-  "torch-starter[dev,datascience,notebook,tracking,data,profiling,security,media,nlp,cv]"
+  "torch-starter[dev,datascience,notebook,tracking,data,profiling,security,media,nlp,cv,rl,llm]"
 ]
 
 [project.urls]
@@ -231,6 +272,8 @@ exclude = [
     "notebooks/.ipynb_checkpoints",
     "data/",
     "logs/",
+    "models/",
+    "checkpoints/",
 ]
 
 [tool.ruff.lint]
@@ -253,6 +296,7 @@ select = [
     "ERA",    # eradicate (commented code)
     "PD",     # pandas-vet
     "NPY",    # numpy specific rules
+    "PERF",   # performance improvements
 ]
 
 ignore = [
@@ -267,6 +311,7 @@ ignore = [
     "PD901",  # Generic variable name for DataFrame
     "ARG002", # Unused method argument (common in inheritance)
     "PTH123", # Path.open() should be used instead of open()
+    "PERF203", # try-except in loop (sometimes necessary)
 ]
 
 # Allow unused variables when underscore-prefixed
@@ -277,7 +322,7 @@ max-complexity = 12
 
 [tool.ruff.lint.isort]
 known-first-party = ["torch_starter"]
-known-third-party = ["torch", "transformers", "datasets", "numpy", "pandas"]
+known-third-party = ["torch", "transformers", "datasets", "numpy", "pandas", "matplotlib", "cv2", "PIL"]
 force-single-line = false
 lines-after-imports = 2
 section-order = [
@@ -289,10 +334,11 @@ section-order = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "ARG001", "ARG002"]
-"notebooks/*" = ["T201", "E402", "F401"]
+"tests/*" = ["S101", "ARG001", "ARG002", "T201"]
+"notebooks/*" = ["T201", "E402", "F401", "B018", "S101"]
 "scripts/*" = ["T201", "S603", "S607"]
 "**/conftest.py" = ["ARG001"]
+"examples/*" = ["T201", "E402", "F401"]
 
 [tool.ruff.format]
 preview = true
@@ -337,11 +383,15 @@ exclude = [
     "build/",
     "dist/", 
     "notebooks/",
+    "examples/",
     ".venv/",
     ".mypy_cache/",
     ".pytest_cache/",
     "__pycache__/",
     "tests/fixtures/",
+    "data/",
+    "logs/",
+    "models/",
 ]
 
 # Type checking overrides for heavy ML libraries
@@ -369,6 +419,14 @@ module = [
     "spacy.*",
     "detectron2.*",
     "mmcv.*",
+    "gymnasium.*",
+    "stable_baselines3.*",
+    "supervision.*",
+    "ultralytics.*",
+    "timm.*",
+    "nvitop.*",
+    "pynvml.*",
+    "nvidia_ml_py.*",
 ]
 ignore_missing_imports = true
 
@@ -378,7 +436,7 @@ disallow_untyped_defs = false
 check_untyped_defs = false
 
 # ==============================================================================
-# PYTEST CONFIGURATION - Testing framework
+# PYTEST CONFIGURATION - Testing framework with GPU support
 # ==============================================================================
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -390,6 +448,9 @@ addopts = [
     "--tb=short",            # Short traceback format
     "--maxfail=3",           # Stop after 3 failures
     "--durations=10",        # Show 10 slowest tests
+    "--cov=torch_starter",   # Coverage reporting
+    "--cov-report=term-missing",
+    "--cov-report=html",
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
@@ -398,9 +459,12 @@ python_functions = ["test_*"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "gpu: marks tests that require GPU (deselect with '-m \"not gpu\"')",
+    "cuda: marks tests that require CUDA (deselect with '-m \"not cuda\"')",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
     "benchmark: marks tests as benchmarks",
+    "memory_intensive: marks tests that use significant GPU memory",
+    "multi_gpu: marks tests that require multiple GPUs",
 ]
 
 # Test discovery patterns
@@ -413,6 +477,8 @@ norecursedirs = [
     "node_modules",
     "data",
     "logs",
+    "models",
+    "checkpoints",
 ]
 
 # Filter warnings
@@ -423,6 +489,8 @@ filterwarnings = [
     "ignore::PendingDeprecationWarning",
     "ignore:.*CUDA.*:UserWarning",
     "ignore:.*PyTorch.*:UserWarning",
+    "ignore:.*torch.*:UserWarning",
+    "ignore::FutureWarning:transformers.*",
 ]
 
 # ==============================================================================
@@ -436,9 +504,11 @@ omit = [
     "*/__pycache__/*",
     "*/verify_setup/*",
     "*/scripts/*",
+    "*/examples/*",
     ".venv/*",
     "build/*",
     "dist/*",
+    "*/benchmarks/*",
 ]
 branch = true
 parallel = true
@@ -464,6 +534,7 @@ exclude_lines = [
 ignore_errors = true
 show_missing = true
 precision = 2
+skip_covered = false
 
 [tool.coverage.html]
 directory = "htmlcov"
@@ -472,18 +543,21 @@ directory = "htmlcov"
 output = "coverage.xml"
 
 # ==============================================================================
-# UV CONFIGURATION - Fast Python package manager
+# UV CONFIGURATION - Fast Python package manager with CUDA support
 # ==============================================================================
 [tool.uv]
 index-strategy = "unsafe-best-match"
 resolution = "highest"
 compile-bytecode = true
 link-mode = "copy"
-concurrent-downloads = 10
+concurrent-downloads = 20
 keyring-provider = "subprocess"
 
-# Default dependency groups to install - using optional-dependencies format
-# default-groups = ["dev"]
+# PyTorch CUDA index configuration
+extra-index-url = ["https://download.pytorch.org/whl/cu121"]
+
+# Default dependency groups to install
+# default-groups = ["dev", "notebook"]
 
 # Index configuration for package sources
 [[tool.uv.index]]
@@ -491,15 +565,19 @@ name = "pypi"
 url = "https://pypi.org/simple"
 default = true
 
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu121"
+
 # ==============================================================================
 # BANDIT CONFIGURATION - Security linting
 # ==============================================================================
 [tool.bandit]
-exclude_dirs = ["tests", ".venv", "build", "dist"]
+exclude_dirs = ["tests", ".venv", "build", "dist", "notebooks", "examples"]
 skips = ["B101", "B601", "B602", "B603"]  # Skip assert, shell usage warnings
 
 [tool.bandit.assert_used]
-skips = ["**/test_*.py", "tests/**"]
+skips = ["**/test_*.py", "tests/**", "notebooks/**"]
 
 # ==============================================================================
 # BLACK CONFIGURATION - Code formatting (fallback if Ruff unavailable)
@@ -507,7 +585,7 @@ skips = ["**/test_*.py", "tests/**"]
 [tool.black]
 line-length = 100
 target-version = ['py312']
-include = '\.pyi?$'
+include = '\.pyi?
 extend-exclude = '''
 /(
   \.eggs
@@ -521,5 +599,8 @@ extend-exclude = '''
   | build
   | dist
   | notebooks/\.ipynb_checkpoints
+  | data
+  | logs
+  | models
 )/
 '''

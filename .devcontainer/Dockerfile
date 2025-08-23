@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.7
 
 # Multi-stage build for CUDA-enabled PyTorch development environment
-# Uses NVIDIA CUDA 12.9.0 runtime with optimized layer caching
+# Uses NVIDIA CUDA 12.1.0 development with optimized layer caching
 
 # ==============================================================================
-# CUDA Base Stage - NVIDIA CUDA runtime with development tools
+# CUDA Base Stage - NVIDIA CUDA development with complete toolkit
 # ==============================================================================
-FROM nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04 AS cuda-base
+FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 AS cuda-base
 
 # Build arguments for cache control and versioning
 ARG BUILDKIT_INLINE_CACHE=1
 ARG PYTHON_VERSION=3.12
-ARG CUDA_VERSION=12.9
+ARG CUDA_VERSION=12.1
 ARG APP_USER=ubuntu
 ARG APP_UID=1000
 ARG APP_GID=1000
@@ -26,18 +26,24 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LIBRARY_PATH} \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    NVIDIA_REQUIRE_CUDA="cuda>=12.9" \
+    NVIDIA_REQUIRE_CUDA="cuda>=12.1" \
     LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+    LC_ALL=C.UTF-8 \
+    # PyTorch CUDA optimization
+    TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 8.9 9.0" \
+    CUDA_LAUNCH_BLOCKING=0 \
+    FORCE_CUDA=1 \
+    PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,garbage_collection_threshold:0.6"
 
 # Verify CUDA installation and create symlinks
-RUN ln -sf /usr/local/cuda-12.9 /usr/local/cuda && \
+RUN ln -sf /usr/local/cuda-12.1 /usr/local/cuda && \
     echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && \
     echo "/usr/local/cuda/compat" >> /etc/ld.so.conf.d/cuda.conf && \
     ldconfig && \
     # Verify CUDA installation
-    nvcc --version || echo "Warning: nvcc not found" && \
-    ls -la /usr/local/cuda/lib64/libcudart* || echo "Warning: CUDA runtime not found"
+    nvcc --version && \
+    ls -la /usr/local/cuda/lib64/libcudart* && \
+    echo "CUDA base setup completed"
 
 # ==============================================================================
 # System Dependencies Stage - Essential tools and libraries
@@ -61,12 +67,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     # SSH and process management
     openssh-client tini sudo \
     # Performance monitoring tools
-    htop iotop nvtop \
+    htop iotop ncdu tree vim tmux screen \
     # Math libraries
     bc \
+    # Additional CUDA development packages
+    cuda-toolkit-12-1 \
+    libcudnn8-dev \
+    libnccl-dev \
+    libcublas-dev-12-1 \
     # Cleanup in same layer
-    && rm -rf /var/lib/apt/lists/* \
-    && git lfs install --system
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && git lfs install --system \
+    && apt-get autoremove -y \
+    && apt-get autoclean
 
 # ==============================================================================
 # User Setup Stage - Create non-root user with proper permissions
@@ -76,8 +89,8 @@ FROM system-deps AS user-setup
 # Create user with same UID/GID as host user for seamless file permissions
 # Use existing ubuntu user (UID 1000) and configure for development
 RUN usermod -aG sudo ${APP_USER} && \
-    # Allow passwordless sudo for convenience in dev environment
-    echo "${APP_USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    # Allow specific sudo commands only for security
+    echo "${APP_USER} ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/dpkg, /usr/bin/systemctl" >> /etc/sudoers && \
     # Create all necessary directories with proper ownership
     mkdir -p \
     /home/${APP_USER}/.cache/huggingface \
@@ -89,7 +102,9 @@ RUN usermod -aG sudo ${APP_USER} && \
     /workspaces \
     /workspaces/data && \
     # Set ownership for all user directories
-    chown -R ${APP_USER}:${APP_USER} /home/${APP_USER} /workspaces
+    chown -R ${APP_USER}:${APP_USER} /home/${APP_USER} /workspaces && \
+    # Set proper permissions
+    chmod 755 /home/${APP_USER}
 
 # ==============================================================================
 # UV Package Manager Stage - Install UV with optimized caching
@@ -106,8 +121,8 @@ ENV UV_INSTALL_DIR=/home/${APP_USER}/.local/bin \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=manual \
-    UV_CONCURRENT_DOWNLOADS=10 \
-    UV_HTTP_TIMEOUT=300 \
+    UV_CONCURRENT_DOWNLOADS=20 \
+    UV_HTTP_TIMEOUT=600 \
     PATH=/home/${APP_USER}/.local/bin:${PATH}
 
 # Install UV with cache mounting for faster rebuilds
@@ -125,43 +140,103 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
+    PYTHONOPTIMIZE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    MALLOC_ARENA_MAX=2
 
 # Install Python with UV and create virtual environment
 RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=${APP_GID} \
     uv python install ${PYTHON_VERSION} && \
     uv venv --clear .venv -p ${PYTHON_VERSION} && \
-    echo "source /workspaces/.venv/bin/activate" >> ~/.bashrc
+    echo "source /workspaces/.venv/bin/activate" >> ~/.bashrc && \
+    echo "export CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-all}" >> ~/.bashrc
 
 # ==============================================================================
-# Dependencies Installation Stage - Install all Python packages
+# Dependencies Installation Stage - Install all Python packages with CUDA PyTorch
 # ==============================================================================
 FROM python-env AS deps-install
 
 # Copy dependency files first for better Docker layer caching
 COPY --chown=${APP_USER}:${APP_USER} pyproject.toml uv.lock* ./
 
-# Install only essential PyTorch CUDA dependencies for testing
+# Install PyTorch CUDA dependencies and other packages
 RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=${APP_GID} \
     . .venv/bin/activate && \
+    # Install CUDA-enabled PyTorch first
+    uv pip install \
+    --extra-index-url https://download.pytorch.org/whl/cu121 \
+    "torch>=2.0.0" \
+    "torchvision>=0.15.0" \
+    "torchaudio>=2.0.0" && \
+    # Then install other dependencies
     uv sync \
     --index-strategy unsafe-best-match \
     --compile-bytecode && \
-    echo "PyTorch CUDA dependencies installed successfully"
+    echo "All dependencies installed successfully"
 
 # ==============================================================================
-# ML Libraries Verification Stage - Test critical imports
+# ML Libraries Verification Stage - Test critical imports and GPU functionality
 # ==============================================================================
 FROM deps-install AS ml-verify
 
-# Verify critical ML libraries can be imported
-RUN . .venv/bin/activate && python -c "import torch; print(f'PyTorch {torch.__version__} - CUDA: {torch.version.cuda} - Available: {torch.cuda.is_available()}')"
+# Verify critical ML libraries can be imported and CUDA works
+RUN . .venv/bin/activate && \
+    python -c "import torch; print(f'✅ PyTorch {torch.__version__} - CUDA: {torch.version.cuda}')" && \
+    python -c "import torch; print(f'✅ CUDA Available: {torch.cuda.is_available()}')" && \
+    python -c "import torch; print(f'✅ CUDA Devices: {torch.cuda.device_count()}')" && \
+    python -c "import torchvision; print(f'✅ TorchVision {torchvision.__version__}')" && \
+    python -c "import transformers; print(f'✅ Transformers {transformers.__version__}')" && \
+    echo "✅ All ML libraries verified successfully"
+
+# ==============================================================================
+# GPU Test Stage - Verify GPU functionality with actual tensor operations
+# ==============================================================================
+FROM ml-verify AS gpu-test
+
+# Create and run a comprehensive GPU test
+RUN . .venv/bin/activate && python -c "
+import torch
+import sys
+
+def test_gpu_functionality():
+try:
+if not torch.cuda.is_available():
+print('⚠️  CUDA not available - will run in CPU mode')
+return True
+
+device_count = torch.cuda.device_count()
+print(f'🖥️  Found {device_count} CUDA device(s)')
+
+for i in range(device_count):
+props = torch.cuda.get_device_properties(i)
+print(f'   Device {i}: {props.name} ({props.total_memory // 1024**3}GB)')
+
+# Test basic tensor operations on GPU
+print('🧪 Testing GPU tensor operations...')
+x = torch.randn(1000, 1000, device='cuda')
+y = torch.randn(1000, 1000, device='cuda')
+z = torch.mm(x, y)
+print(f'✅ GPU tensor test passed - Result shape: {z.shape}')
+
+# Test memory management
+torch.cuda.empty_cache()
+memory_allocated = torch.cuda.memory_allocated(0) // 1024**2
+print(f'📊 GPU memory allocated: {memory_allocated}MB')
+
+return True
+except Exception as e:
+print(f'❌ GPU test failed: {e}')
+return False
+
+success = test_gpu_functionality()
+sys.exit(0 if success else 1)
+"
 
 # ==============================================================================
 # Final Application Stage - Install project and setup runtime
 # ==============================================================================
-FROM ml-verify AS final
+FROM gpu-test AS final
 
 # Copy entire project (this layer will change frequently during development)
 COPY --chown=${APP_USER}:${APP_USER} . .
@@ -176,7 +251,10 @@ RUN . .venv/bin/activate && \
     # Create useful development symlinks
     ln -sf /workspaces/data /home/${APP_USER}/data && \
     ln -sf /workspaces/notebooks /home/${APP_USER}/notebooks && \
-    echo "Project setup completed"
+    # Create GPU monitoring script
+    echo '#!/bin/bash\nwatch -n 1 "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv"' > /home/${APP_USER}/.local/bin/gpu-monitor && \
+    chmod +x /home/${APP_USER}/.local/bin/gpu-monitor && \
+    echo "✅ Project setup completed"
 
 # ==============================================================================
 # Runtime Configuration and Health Checks
@@ -186,11 +264,14 @@ RUN . .venv/bin/activate && \
 EXPOSE 8888 8000 6006 7860
 
 # Comprehensive health check that verifies CUDA functionality
-HEALTHCHECK --interval=300s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=300s --timeout=30s --start-period=60s --retries=3 \
     CMD . .venv/bin/activate && python -c " \
     import torch; \
     print(f'Health check: PyTorch {torch.__version__}'); \
     print(f'CUDA available: {torch.cuda.is_available()}'); \
+    if torch.cuda.is_available(): \
+    x = torch.tensor([1.0], device='cuda'); \
+    print(f'GPU test: {x.device}'); \
     exit(0)" || exit 1
 
 # Set up container entrypoint with proper signal handling
@@ -202,11 +283,11 @@ CMD ["/bin/bash", "-l"]
 # ==============================================================================
 LABEL org.opencontainers.image.title="torch_starter" \
     org.opencontainers.image.description="CUDA-enabled PyTorch development environment with Python 3.12" \
-    org.opencontainers.image.version="2.1-cuda12.9" \
+    org.opencontainers.image.version="2.2-cuda12.1" \
     org.opencontainers.image.vendor="PyTorch DevContainer" \
     org.opencontainers.image.licenses="MIT" \
-    cuda.version="12.9" \
-    pytorch.version=">=2.4.0" \
+    cuda.version="12.1" \
+    pytorch.version=">=2.0.0" \
     python.version="3.12"
 
 # Development environment hints for better IDE integration

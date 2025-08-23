@@ -2,6 +2,7 @@
 .git
 .gitignore
 .gitattributes
+.github/
 
 # Python
 __pycache__/
@@ -42,61 +43,123 @@ venv.bak/
 *.swp
 *.swo
 *~
+.DS_Store
+Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
 
-# Testing
+# Testing and Quality Assurance
 .tox/
 .coverage
 .pytest_cache/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+.bandit
+coverage.xml
 
 # Documentation
 docs/_build/
+site/
 *.md
 LICENSE
+README*
+CHANGELOG*
 
-# Data and caches (will be mounted as volumes)
+# Data, models, and caches (will be mounted as volumes)
 data/
+datasets/
+models/
+checkpoints/
+weights/
 *.csv
 *.json
+*.jsonl
 *.pkl
+*.pickle
 *.h5
 *.hdf5
+*.npz
 
-# Models and weights
+# Model files and weights
 *.pth
 *.pt
 *.ckpt
 *.safetensors
+*.bin
+*.onnx
 
-# Logs
+# Logs and outputs
 *.log
 logs/
+outputs/
+runs/
 wandb/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Dev container specific
-.devcontainer/
-docker-compose*.yml
+mlruns/
+tensorboard/
 
 # Environment files
 .env*
 !.env.example
+.envrc
 
 # Temporary files
 tmp/
 temp/
 *.tmp
+.cache/
 
 # Large files that should be downloaded at runtime
 *.zip
 *.tar.gz
 *.tar.bz2
+*.tar.xz
+*.7z
+
+# Media files
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.mp3
+*.wav
+*.flac
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.webp
+
+# Development and CI/CD
+.devcontainer/
+.github/
+docker-compose*.yml
+Dockerfile*
+.pre-commit-config.yaml
+.gitpod.yml
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node.js (if any frontend components)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Additional ML/AI specific
+*.tfrecord
+*.tfrecords
+*.parquet
+*.arrow
+*.feather
