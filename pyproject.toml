@@ -1,7 +1,7 @@
 [project]
 name = "torch-starter"
 version = "0.1.0"
-description = "CUDA-enabled PyTorch deep learning development environment with uv and VS Code Dev Containers (uses CUDA 12.6 PyTorch wheels)."
+description = "CUDA-enabled PyTorch deep learning development environment with uv and VS Code Dev Containers (uses CUDA 12.8.1 PyTorch wheels)."
 requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }
 authors = [{ name = "Your Name", email = "your.email@domain.com" }]
@@ -11,9 +11,10 @@ keywords = ["deep-learning", "pytorch", "transformers", "cuda", "gpu", "uv", "de
 # Core dependencies - PyTorch CUDA wheels installed separately in Dockerfile
 dependencies = [
 
-  "torch",
-  "torchvision",
-  "torchaudio",
+  "torch==2.7.1+cu128",
+  "torchvision==0.22.1+cu128",
+  "torchaudio==2.7.1+cu128",
+
   "numpy",
   "pandas",
   "scipy",
@@ -65,7 +66,6 @@ dev = [
   "pytest-mock",
   "pytest-asyncio",
   "pytest-xdist",  # Parallel testing
-  "pytest-gpu",     # GPU-specific testing
   
   # Type stubs for better type checking
   "types-requests",
@@ -210,8 +210,7 @@ llm = [
   "anthropic",
   "langchain",
   "langchain-community",
-  "chromadb0",
-  "faiss-gpu",
+  "chromadb"
 ]
 
 # All extras combined for comprehensive installation
@@ -552,15 +551,8 @@ compile-bytecode = true
 link-mode = "copy"
 concurrent-downloads = 20
 keyring-provider = "subprocess"
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu126" }
-torchvision = { index = "pytorch-cu126" }
-torchaudio = { index = "pytorch-cu126" }
-
-[tool.uv.indexes]
-pypi = { url = "https://pypi.org/simple" }
-pytorch-cu121 = { url = "https://download.pytorch.org/whl/cu126" }
+index-url = "https://pypi.org/simple"
+extra-index-url = ["https://download.pytorch.org/whl/cu128"]
 
 # ==============================================================================
 # BANDIT CONFIGURATION - Security linting
@@ -578,7 +570,7 @@ skips = ["**/test_*.py", "tests/**", "notebooks/**"]
 [tool.black]
 line-length = 100
 target-version = ['py312']
-include = '\.pyi?
+include = '\.pyi?$'
 extend-exclude = '''
 /(
   \.eggs
