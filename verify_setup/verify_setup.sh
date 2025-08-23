@@ -177,12 +177,12 @@ check_cuda_compatibility() {
     
     info "PyTorch CUDA version: $pytorch_cuda_version"
     
-    # Verify CUDA 12.9.0 compatibility
-    if [[ "$pytorch_cuda_version" != "12.9" ]]; then
-        warn "PyTorch CUDA version ($pytorch_cuda_version) differs from expected CUDA 12.9"
-        info "This container is optimized for CUDA 12.9.0"
+    # Verify CUDA 12.6.0 compatibility
+    if [[ "$pytorch_cuda_version" != "12.6.0" ]]; then
+        warn "PyTorch CUDA version ($pytorch_cuda_version) differs from expected CUDA 12.6.0"
+        info "This container is optimized for CUDA 12.6.0"
     else
-        pass "PyTorch CUDA 12.9 compatibility confirmed"
+        pass "PyTorch CUDA 12.6.0 compatibility confirmed"
     fi
 }
 
@@ -235,8 +235,8 @@ try:
             print("  💡 Reinstall PyTorch with CUDA: uv sync --extra torch-cu126")
         else:
             print("  ✓ PyTorch was compiled with CUDA support")
-            if info['cuda_version'] != "12.9":
-                print(f"  ⚠ Expected CUDA 12.9, found: {info['cuda_version']}")
+            if info['cuda_version'] != "12.6.0":
+                print(f"  ⚠ Expected CUDA 12.6.0, found: {info['cuda_version']}")
             print("  ⚠ CUDA runtime libraries may be missing or incompatible")
             print("  💡 Check CUDA runtime installation in container")
     
@@ -430,7 +430,7 @@ print_cuda_runtime_info() {
   
   # Check CUDA library paths
   info "CUDA library path checks:"
-  local cuda_paths=("/usr/local/cuda-12.9.0/lib64" "/usr/local/cuda/lib64" "/usr/lib/x86_64-linux-gnu")
+  local cuda_paths=("/usr/local/cuda-12.6.0/lib64" "/usr/local/cuda/lib64" "/usr/lib/x86_64-linux-gnu")
   for path in "${cuda_paths[@]}"; do
     if [[ -d "$path" ]]; then
       local cuda_libs=$(find "$path" -name "libcuda*" 2>/dev/null | wc -l)
@@ -590,7 +590,7 @@ check_environment_config() {
     "NVIDIA_VISIBLE_DEVICES:NVIDIA device visibility"
     "NVIDIA_DRIVER_CAPABILITIES:NVIDIA driver capabilities"
     "LD_LIBRARY_PATH:Library search path"
-    "CUDA_HOME:CUDA 12.9.0 installation path"
+    "CUDA_HOME:CUDA 12.6.0 installation path"
   )
   
   for var_desc in "${env_vars[@]}"; do

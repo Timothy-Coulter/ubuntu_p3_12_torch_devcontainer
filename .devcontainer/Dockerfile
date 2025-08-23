@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.7
 
 # Multi-stage build for CUDA-enabled PyTorch development environment
-# Uses NVIDIA CUDA 12.1.0 development with optimized layer caching
+# Uses NVIDIA CUDA 12.6.0 development with optimized layer caching
 
 # ==============================================================================
 # CUDA Base Stage - NVIDIA CUDA development with complete toolkit
 # ==============================================================================
-FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 AS cuda-base
+FROM 12.6.0-cudnn-devel-ubuntu24.04 AS cuda-base
 
 # Build arguments for cache control and versioning
 ARG BUILDKIT_INLINE_CACHE=1
 ARG PYTHON_VERSION=3.12
-ARG CUDA_VERSION=12.1
+ARG CUDA_VERSION=12.6.0
 ARG APP_USER=ubuntu
 ARG APP_UID=1000
 ARG APP_GID=1000
@@ -26,7 +26,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LIBRARY_PATH} \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    NVIDIA_REQUIRE_CUDA="cuda>=12.1" \
+    NVIDIA_REQUIRE_CUDA="cuda>=12.6.0" \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     # PyTorch CUDA optimization
@@ -36,11 +36,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,garbage_collection_threshold:0.6"
 
 # Verify CUDA installation and create symlinks
-RUN ln -sf /usr/local/cuda-12.1 /usr/local/cuda && \
+RUN ln -sf /usr/local/cuda-12.6.0 /usr/local/cuda && \
     echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && \
     echo "/usr/local/cuda/compat" >> /etc/ld.so.conf.d/cuda.conf && \
     ldconfig && \
-    # Verify CUDA installation
     nvcc --version && \
     ls -la /usr/local/cuda/lib64/libcudart* && \
     echo "CUDA base setup completed"
@@ -71,10 +70,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     # Math libraries
     bc \
     # Additional CUDA development packages
-    cuda-toolkit-12-1 \
+    cuda-toolkit-12-6 \
     libcudnn8-dev \
     libnccl-dev \
-    libcublas-dev-12-1 \
+    libcublas-dev-12-6 \
     # Cleanup in same layer
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && git lfs install --system \
@@ -165,7 +164,7 @@ RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=${A
     . .venv/bin/activate && \
     # Install CUDA-enabled PyTorch first
     uv pip install \
-    --extra-index-url https://download.pytorch.org/whl/cu121 \
+    --extra-index-url https://download.pytorch.org/whl/cu126 \
     "torch>=2.0.0" \
     "torchvision>=0.15.0" \
     "torchaudio>=2.0.0" && \
@@ -195,43 +194,35 @@ RUN . .venv/bin/activate && \
 FROM ml-verify AS gpu-test
 
 # Create and run a comprehensive GPU test
-RUN . .venv/bin/activate && python -c "
-import torch
-import sys
-
-def test_gpu_functionality():
-try:
-if not torch.cuda.is_available():
-print('⚠️  CUDA not available - will run in CPU mode')
-return True
-
-device_count = torch.cuda.device_count()
-print(f'🖥️  Found {device_count} CUDA device(s)')
-
-for i in range(device_count):
-props = torch.cuda.get_device_properties(i)
-print(f'   Device {i}: {props.name} ({props.total_memory // 1024**3}GB)')
-
-# Test basic tensor operations on GPU
-print('🧪 Testing GPU tensor operations...')
-x = torch.randn(1000, 1000, device='cuda')
-y = torch.randn(1000, 1000, device='cuda')
-z = torch.mm(x, y)
-print(f'✅ GPU tensor test passed - Result shape: {z.shape}')
-
-# Test memory management
-torch.cuda.empty_cache()
-memory_allocated = torch.cuda.memory_allocated(0) // 1024**2
-print(f'📊 GPU memory allocated: {memory_allocated}MB')
-
-return True
-except Exception as e:
-print(f'❌ GPU test failed: {e}')
-return False
-
-success = test_gpu_functionality()
-sys.exit(0 if success else 1)
-"
+RUN . .venv/bin/activate && python -c "\
+    import torch;\
+    import sys;\
+    \
+    def test_gpu_functionality():\
+    try:\
+    if not torch.cuda.is_available():\
+    print('⚠️  CUDA not available - will run in CPU mode');\
+    return True;\
+    device_count = torch.cuda.device_count();\
+    print(f'🖥️  Found {device_count} CUDA device(s)');\
+    for i in range(device_count):\
+    props = torch.cuda.get_device_properties(i);\
+    print(f'   Device {i}: {props.name} ({props.total_memory // 1024**3}GB)');\
+    print('🧪 Testing GPU tensor operations...');\
+    x = torch.randn(1000, 1000, device='cuda');\
+    y = torch.randn(1000, 1000, device='cuda');\
+    z = torch.mm(x, y);\
+    print(f'✅ GPU tensor test passed - Result shape: {z.shape}');\
+    torch.cuda.empty_cache();\
+    memory_allocated = torch.cuda.memory_allocated(0) // 1024**2;\
+    print(f'📊 GPU memory allocated: {memory_allocated}MB');\
+    return True;\
+    except Exception as e:\
+    print(f'❌ GPU test failed: {e}');\
+    return False;\
+    \
+    success = test_gpu_functionality();\
+    sys.exit(0 if success else 1)"
 
 # ==============================================================================
 # Final Application Stage - Install project and setup runtime
@@ -265,14 +256,7 @@ EXPOSE 8888 8000 6006 7860
 
 # Comprehensive health check that verifies CUDA functionality
 HEALTHCHECK --interval=300s --timeout=30s --start-period=60s --retries=3 \
-    CMD . .venv/bin/activate && python -c " \
-    import torch; \
-    print(f'Health check: PyTorch {torch.__version__}'); \
-    print(f'CUDA available: {torch.cuda.is_available()}'); \
-    if torch.cuda.is_available(): \
-    x = torch.tensor([1.0], device='cuda'); \
-    print(f'GPU test: {x.device}'); \
-    exit(0)" || exit 1
+    CMD /bin/bash -c ". .venv/bin/activate && python -c \"import torch; print(f'Health check: PyTorch {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); if torch.cuda.is_available(): x = torch.tensor([1.0], device='cuda'); print(f'GPU test: {x.device}'); exit(0); else: exit(1)\"" || exit 1
 
 # Set up container entrypoint with proper signal handling
 ENTRYPOINT ["/usr/bin/tini", "--"]
@@ -283,10 +267,10 @@ CMD ["/bin/bash", "-l"]
 # ==============================================================================
 LABEL org.opencontainers.image.title="torch_starter" \
     org.opencontainers.image.description="CUDA-enabled PyTorch development environment with Python 3.12" \
-    org.opencontainers.image.version="2.2-cuda12.1" \
+    org.opencontainers.image.version="2.2-cuda12.6.0" \
     org.opencontainers.image.vendor="PyTorch DevContainer" \
     org.opencontainers.image.licenses="MIT" \
-    cuda.version="12.1" \
+    cuda.version="12.6.0" \
     pytorch.version=">=2.0.0" \
     python.version="3.12"
 
