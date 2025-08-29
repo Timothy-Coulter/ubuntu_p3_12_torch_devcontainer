@@ -94,12 +94,7 @@ cmd_verify_setup() {
 
   # PyTorch CUDA check
   section "PyTorch / CUDA"
-  $py - <<'EOF'
-import torch
-print(f"PyTorch {torch.__version__}")
-print(f"Built with CUDA: {torch.version.cuda}")
-print(f"CUDA available: {torch.cuda.is_available()}")
-EOF
+  $py verify_setup/print_torch_info.py
 
   # CUDA version check
   system_cuda=$(grep -oE "[0-9]+\.[0-9]+" /usr/local/cuda/version.txt | head -n1 || echo "unknown")
@@ -109,7 +104,7 @@ EOF
   fi
 
   # Linkage check
-  torch_lib=$($py -c "import torch, os; print(os.path.join(os.path.dirname(torch.__file__), 'lib', 'libtorch_cuda.so'))" 2>/dev/null || echo "")
+  torch_lib=$($py verify_setup/get_torch_lib_path.py 2>/dev/null || echo "")
   if [[ -f "$torch_lib" ]]; then
     log_info "Checking CUDA linkage in $torch_lib"
     if ldd "$torch_lib" | grep -q "/usr/local/cuda"; then

@@ -1,20 +1,18 @@
 [project]
 name = "torch-starter"
 version = "0.1.0"
-description = "CUDA-enabled PyTorch deep learning development environment with uv and VS Code Dev Containers (uses CUDA 12.8.1 PyTorch wheels)."
-requires-python = ">=3.12,<3.13"
+description = "PyTorch 2.8.0 deep learning development environment with CUDA 12.9 support using uv and VS Code Dev Containers."
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Your Name", email = "your.email@domain.com" }]
 maintainers = [{ name = "Your Name", email = "your.email@domain.com" }]
 keywords = ["deep-learning", "pytorch", "transformers", "cuda", "gpu", "uv", "devcontainer"]
 
-# Core dependencies - PyTorch CUDA wheels installed separately in Dockerfile
+# Core dependencies - PyTorch is provided by the base image, additional packages installed here
 dependencies = [
+  # PyTorch ecosystem is already included in the base image (pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime)
 
-  "torch==2.7.1+cu128",
-  "torchvision==0.22.1+cu128",
-  "torchaudio==2.7.1+cu128",
-
+  # Core scientific computing
   "numpy",
   "pandas",
   "scipy",
@@ -61,7 +59,6 @@ dev = [
   "mypy",
   
   # Testing framework
-  "pytest",
   "pytest",
   "pytest-mock",
   "pytest-asyncio",
@@ -229,7 +226,7 @@ Changelog = "https://github.com/yourusername/torch-starter/releases"
 torch-starter = "torch_starter.cli:main"
 
 [build-system]
-requires = ["hatchling>=1.25.0"]
+requires = ["hatchling>=1.25.0", "uv>=0.1.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -246,7 +243,7 @@ allow-direct-references = true
 # ==============================================================================
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py310"
 exclude = [
     ".bzr",
     ".direnv", 
@@ -352,7 +349,7 @@ docstring-code-line-length = 88
 # MYPY CONFIGURATION - Static type checking
 # ==============================================================================
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.10"
 strict = true
 warn_unused_configs = true
 warn_return_any = true
@@ -542,7 +539,7 @@ directory = "htmlcov"
 output = "coverage.xml"
 
 # ==============================================================================
-# UV CONFIGURATION - Fast Python package manager with CUDA support
+# UV CONFIGURATION - Fast Python package manager
 # ==============================================================================
 [tool.uv]
 index-strategy = "unsafe-best-match"
@@ -551,8 +548,8 @@ compile-bytecode = true
 link-mode = "copy"
 concurrent-downloads = 20
 keyring-provider = "subprocess"
-index-url = "https://pypi.org/simple"
-extra-index-url = ["https://download.pytorch.org/whl/cu128"]
+
+# Note: No extra PyTorch index needed since PyTorch is provided by base image
 
 # ==============================================================================
 # BANDIT CONFIGURATION - Security linting
@@ -569,8 +566,9 @@ skips = ["**/test_*.py", "tests/**", "notebooks/**"]
 # ==============================================================================
 [tool.black]
 line-length = 100
-target-version = ['py312']
-include = '\.pyi?$'
+target-version = ['py310']
+include = '\.pyi?'
+  
 extend-exclude = '''
 /(
   \.eggs

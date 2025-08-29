@@ -1,53 +1,32 @@
 # syntax=docker/dockerfile:1.7
 
-# Multi-stage build for CUDA-enabled PyTorch development environment
-# Uses NVIDIA CUDA 12.8.1 development with optimized layer caching
+# Multi-stage build for PyTorch development environment using official PyTorch image
+# Uses PyTorch 2.8.0 with CUDA 12.9 and cuDNN 9 runtime
 
 # ==============================================================================
-# CUDA Base Stage - NVIDIA CUDA development with complete toolkit
+# PyTorch Base Stage - Official PyTorch image with CUDA runtime
 # ==============================================================================
-FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS cuda-base
+FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime AS pytorch-base
 
 # Build arguments for cache control and versioning
 ARG BUILDKIT_INLINE_CACHE=1
-ARG PYTHON_VERSION=3.12
-ARG CUDA_VERSION=12.8.1
+ARG PYTHON_VERSION=3.10
+ARG CUDA_VERSION=12.9
 ARG APP_USER=ubuntu
 ARG APP_UID=1000
 ARG APP_GID=1000
+# Configurable CUDA architectures
+ARG TORCH_CUDA_ARCH_LIST=7.0,7.5,8.0,8.6,8.9,9.0
 
-# CUDA and system environment setup
-ENV DEBIAN_FRONTEND=noninteractive \
-    CUDA_VERSION=${CUDA_VERSION} \
-    CUDA_HOME=/usr/local/cuda \
-    CUDA_ROOT=/usr/local/cuda \
-    PATH=/usr/local/cuda/bin:${PATH} \
-    LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/compat:${LD_LIBRARY_PATH} \
-    LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LIBRARY_PATH} \
-    NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    NVIDIA_REQUIRE_CUDA="cuda>=${CUDA_VERSION}" \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8 \
-    # PyTorch CUDA optimization
-    TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 8.9 9.0" \
-    CUDA_LAUNCH_BLOCKING=0 \
-    FORCE_CUDA=1 \
-    PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,garbage_collection_threshold:0.6"
-
-# Verify CUDA installation and create symlinks
-RUN ln -sf /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda && \
-    echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && \
-    echo "/usr/local/cuda/compat" >> /etc/ld.so.conf.d/cuda.conf && \
-    ldconfig && \
-    nvcc --version && \
-    ls -la /usr/local/cuda/lib64/libcudart* && \
-    echo "CUDA base setup completed"
+# Verify PyTorch and CUDA installation
+RUN python -c "import torch; print(f'PyTorch {torch.__version__} with CUDA {torch.version.cuda}')" && \
+    python -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()}')" && \
+    echo "PyTorch base image verified"
 
 # ==============================================================================
 # System Dependencies Stage - Essential tools and libraries
 # ==============================================================================
-FROM cuda-base AS system-deps
+FROM pytorch-base AS system-deps
 
 # System package installation with optimized caching
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -80,11 +59,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # ==============================================================================
 FROM system-deps AS user-setup
 
-# Create user with same UID/GID as host user for seamless file permissions
-# Use existing ubuntu user (UID 1000) and configure for development
-RUN usermod -aG sudo ${APP_USER} && \
+# Create ubuntu user if it doesn't exist (PyTorch image uses root by default)
+RUN if ! id -u ${APP_USER} >/dev/null 2>&1; then \
+    useradd -m -u ${APP_UID} -g root -s /bin/bash ${APP_USER}; \
+    fi && \
+    usermod -aG sudo ${APP_USER} && \
     # Allow specific sudo commands only for security
-    echo "${APP_USER} ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/dpkg, /usr/bin/systemctl" >> /etc/sudoers && \
     # Create all necessary directories with proper ownership
     mkdir -p \
     /home/${APP_USER}/.cache/huggingface \
@@ -96,7 +76,7 @@ RUN usermod -aG sudo ${APP_USER} && \
     /workspaces \
     /workspaces/data && \
     # Set ownership for all user directories
-    chown -R ${APP_USER}:${APP_USER} /home/${APP_USER} /workspaces && \
+    chown -R ${APP_USER}:root /home/${APP_USER} /workspaces && \
     # Set proper permissions
     chmod 755 /home/${APP_USER}
 
@@ -120,12 +100,12 @@ ENV UV_INSTALL_DIR=/home/${APP_USER}/.local/bin \
     PATH=/home/${APP_USER}/.local/bin:${PATH}
 
 # Install UV with cache mounting for faster rebuilds
-RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=${APP_GID} \
-    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
+    UV_VERSION=0.1.45 curl -LsSf https://astral.sh/uv/install.sh | sh && \
     uv --version
 
 # ==============================================================================
-# Python Environment Stage - Install Python and create virtual environment
+# Python Environment Stage - Create virtual environment (keep existing Python)
 # ==============================================================================
 FROM uv-install AS python-env
 
@@ -139,95 +119,45 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     MALLOC_ARENA_MAX=2
 
-# Install Python with UV and create virtual environment
-RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=${APP_GID} \
-    uv python install ${PYTHON_VERSION} && \
-    uv venv --clear .venv -p ${PYTHON_VERSION} && \
+# Create virtual environment using existing Python from PyTorch image
+RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
+    python -m venv .venv && \
     echo "source /workspaces/.venv/bin/activate" >> ~/.bashrc && \
     echo "export CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-all}" >> ~/.bashrc
 
 # ==============================================================================
-# Dependencies Installation Stage - Install all Python packages with CUDA PyTorch
+# Dependencies Installation Stage - Install additional Python packages
 # ==============================================================================
 FROM python-env AS deps-install
 
 # Copy dependency files first for better Docker layer caching
-COPY --chown=${APP_USER}:${APP_USER} pyproject.toml uv.lock* ./
+COPY --chown=${APP_USER}:root pyproject.toml uv.lock* ./
 
-RUN echo nvidia-smi
-
-# Install PyTorch CUDA dependencies and other packages
-RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=${APP_GID} \
+# Install project dependencies including torchvision and transformers
+RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
     . .venv/bin/activate && \
-    uv sync \
-    --compile-bytecode && \
+    uv pip install . --compile-bytecode && \
+    # Explicitly install transformers with its dependencies
+    uv pip install transformers --compile-bytecode && \
+    # Explicitly install torchvision with its dependencies
+    uv pip install torchvision --compile-bytecode && \
     echo "All dependencies installed successfully"
-
-# ==============================================================================
-# ML Libraries Verification Stage - Test critical imports and GPU functionality
-# ==============================================================================
-FROM deps-install AS ml-verify
-
-# Verify critical ML libraries can be imported and CUDA works
-RUN . .venv/bin/activate && \
-    python -c "import torch; print(f'✅ PyTorch {torch.__version__} - CUDA: {torch.version.cuda}')" && \
-    python -c "import torch; print(f'✅ CUDA Available: {torch.cuda.is_available()}')" && \
-    python -c "import torch; print(f'✅ CUDA Devices: {torch.cuda.device_count()}')" && \
-    python -c "import torchvision; print(f'✅ TorchVision {torchvision.__version__}')" && \
-    python -c "import transformers; print(f'✅ Transformers {transformers.__version__}')" && \
-    echo "✅ All ML libraries verified successfully"
-
-# ==============================================================================
-# GPU Test Stage - Verify GPU functionality with actual tensor operations
-# ==============================================================================
-FROM ml-verify AS gpu-test
-
-# Create and run a comprehensive GPU test
-RUN . .venv/bin/activate && python -c "\
-    import torch;\
-    import sys;\
-    \
-    def test_gpu_functionality():\
-    try:\
-    if not torch.cuda.is_available():\
-    print('⚠️  CUDA not available - will run in CPU mode');\
-    return True;\
-    device_count = torch.cuda.device_count();\
-    print(f'🖥️  Found {device_count} CUDA device(s)');\
-    for i in range(device_count):\
-    props = torch.cuda.get_device_properties(i);\
-    print(f'   Device {i}: {props.name} ({props.total_memory // 1024**3}GB)');\
-    print('🧪 Testing GPU tensor operations...');\
-    x = torch.randn(1000, 1000, device='cuda');\
-    y = torch.randn(1000, 1000, device='cuda');\
-    z = torch.mm(x, y);\
-    print(f'✅ GPU tensor test passed - Result shape: {z.shape}');\
-    torch.cuda.empty_cache();\
-    memory_allocated = torch.cuda.memory_allocated(0) // 1024**2;\
-    print(f'📊 GPU memory allocated: {memory_allocated}MB');\
-    return True;\
-    except Exception as e:\
-    print(f'❌ GPU test failed: {e}');\
-    return False;\
-    \
-    success = test_gpu_functionality();\
-    sys.exit(0 if success else 1)"
 
 # ==============================================================================
 # Final Application Stage - Install project and setup runtime
 # ==============================================================================
-FROM gpu-test AS final
+FROM deps-install AS final
 
 # Copy entire project (this layer will change frequently during development)
-COPY --chown=${APP_USER}:${APP_USER} . .
+COPY --chown=${APP_USER}:root . .
 
 # Install project in development mode and setup Jupyter kernel
 RUN . .venv/bin/activate && \
     uv pip install -e . --compile-bytecode && \
-    # Setup Jupyter kernel with project name
+    # Setup Jupyter kernel with project name (using Python 3.12)
     python -m ipykernel install --user \
-    --name torch_starter-${PYTHON_VERSION} \
-    --display-name "Python ${PYTHON_VERSION} (torch_starter)" && \
+    --name torch_starter-3.12 \
+    --display-name "Python 3.12 (torch_starter)" && \
     # Create useful development symlinks
     ln -sf /workspaces/data /home/${APP_USER}/data && \
     ln -sf /workspaces/notebooks /home/${APP_USER}/notebooks && \
@@ -235,6 +165,17 @@ RUN . .venv/bin/activate && \
     echo '#!/bin/bash\nwatch -n 1 "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv"' > /home/${APP_USER}/.local/bin/gpu-monitor && \
     chmod +x /home/${APP_USER}/.local/bin/gpu-monitor && \
     echo "✅ Project setup completed"
+
+# Moved verification to runtime
+CMD . .venv/bin/activate && \
+    python -c "import torch; print(f'✅ PyTorch {torch.__version__} - CUDA: {torch.version.cuda}')" && \
+    python -c "import torch; print(f'✅ CUDA Available: {torch.cuda.is_available()}')" && \
+    python -c "import torch; print(f'✅ CUDA Devices: {torch.cuda.device_count()}')" && \
+    python -c "import torchvision; print(f'✅ TorchVision {torchvision.__version__}')" && \
+    python -c "import transformers; print(f'✅ Transformers {transformers.__version__}')" && \
+    python verify_setup/gpu_test.py && \
+    bash verify_setup/verify_setup.sh && \
+    /bin/bash -l
 
 # ==============================================================================
 # Runtime Configuration and Health Checks
@@ -255,12 +196,12 @@ CMD ["/bin/bash", "-l"]
 # Metadata and Labels
 # ==============================================================================
 LABEL org.opencontainers.image.title="torch_starter" \
-    org.opencontainers.image.description="CUDA-enabled PyTorch development environment with Python 3.12" \
-    org.opencontainers.image.version="2.2-cuda${CUDA_VERSION}" \
+    org.opencontainers.image.description="PyTorch 2.8.0 development environment with CUDA 12.9 and Python 3.12" \
+    org.opencontainers.image.version="2.8-cuda${CUDA_VERSION}" \
     org.opencontainers.image.vendor="PyTorch DevContainer" \
     org.opencontainers.image.licenses="MIT" \
     cuda.version="${CUDA_VERSION}" \
-    pytorch.version=">=2.0.0" \
+    pytorch.version="2.8.0" \
     python.version="3.12"
 
 # Development environment hints for better IDE integration

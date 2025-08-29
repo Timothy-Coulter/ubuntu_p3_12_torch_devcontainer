@@ -62,9 +62,9 @@ check_python_version() {
   
   echo "Python version: ${version}"
   
-  # Require 3.12.x
-  if ! "$py" -c 'import sys; sys.exit(0 if (sys.version_info[:2] == (3,12)) else 1)' 2>/dev/null; then
-    fail "Python 3.12 is required, found: ${version}"
+  # Require at least Python 3.10
+  if ! "$py" -c 'import sys; sys.exit(0 if (sys.version_info.major == 3 and sys.version_info.minor >= 10) else 1)' 2>/dev/null; then
+    fail "Python >=3.10 is required, found: ${version}"
     return 1
   fi
   
@@ -167,7 +167,7 @@ PY
 
 check_cuda_compatibility() {
     local pytorch_cuda_version
-    pytorch_cuda_version=$(python -c "import torch; print(torch.version.cuda)" 2>/dev/null || echo "none")
+    pytorch_cuda_version=$(python "$(dirname "${BASH_SOURCE[0]}")/get_pytorch_cuda.py" 2>/dev/null || echo "none")
     
     if [[ "$pytorch_cuda_version" == "none" ]]; then
         fail "PyTorch was not compiled with CUDA support"
