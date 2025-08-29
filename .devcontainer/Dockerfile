@@ -7,7 +7,7 @@
 # ==============================================================================
 # PyTorch Base Stage - Official PyTorch image with CUDA runtime
 # ==============================================================================
-FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel AS pytorch-base
+FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime AS pytorch-base
 
 # Build arguments for cache control and versioning
 ARG BUILDKIT_INLINE_CACHE=1
