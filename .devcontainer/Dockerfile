@@ -60,9 +60,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # ==============================================================================
 FROM system-deps AS user-setup
 
-# Create ubuntu user if it doesn't exist (PyTorch image uses root by default)
-RUN if ! id -u ${APP_USER} >/dev/null 2>&1; then \
-    useradd -m -u ${APP_UID} -g root -s /bin/bash ${APP_USER}; \
+# Create ubuntu group and user
+RUN if ! getent group ${APP_USER} >/dev/null; then \
+    groupadd -g ${APP_GID} ${APP_USER}; \
+    fi && \
+    if ! id -u ${APP_USER} >/dev/null 2>&1; then \
+    useradd -m -u ${APP_UID} -g ${APP_GID} -s /bin/bash ${APP_USER}; \
     fi && \
     usermod -aG sudo ${APP_USER} && \
     # Create all necessary directories with proper ownership
@@ -76,7 +79,7 @@ RUN if ! id -u ${APP_USER} >/dev/null 2>&1; then \
     /workspaces \
     /workspaces/torch-starter && \
     # Set ownership for all user directories
-    chown -R ${APP_USER}:root /home/${APP_USER} /workspaces && \
+    chown -R ${APP_USER}:${APP_USER} /home/${APP_USER} /workspaces && \
     # Set proper permissions
     chmod 755 /home/${APP_USER} /workspaces
 

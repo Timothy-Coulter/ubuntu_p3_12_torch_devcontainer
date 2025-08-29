@@ -1,7 +1,7 @@
 {
   "name": "torch_starter-cuda-volume (PyTorch 2.8.0, CUDA 12.9, UV, System Python)",
   "build": {
-    "dockerfile": "Dockerfile.volume",
+    "dockerfile": "Dockerfile",
     "context": ".",
     "options": [
       "--build-arg",
