@@ -1,53 +1,52 @@
 [project]
 name = "torch-starter"
 version = "0.1.0"
-description = "PyTorch 2.8.0 deep learning development environment with CUDA 12.9 support using uv and VS Code Dev Containers."
-requires-python = "==3.11.13"
+description = "PyTorch 2.8.0 deep learning development environment with CUDA 12.9 support using uv and system Python with VS Code Dev Containers."
+requires-python = ">=3.11.0"
 license = { text = "MIT" }
 authors = [{ name = "Your Name", email = "your.email@domain.com" }]
 maintainers = [{ name = "Your Name", email = "your.email@domain.com" }]
 keywords = ["deep-learning", "pytorch", "transformers", "cuda", "gpu", "uv", "devcontainer"]
 
-# Core dependencies - PyTorch is provided by the base image, additional packages installed here
+# Core dependencies - PyTorch ecosystem is provided by the base image (pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel)
+# Only additional packages that are not in the base image are listed here
 dependencies = [
-  # PyTorch ecosystem is already included in the base image (pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime)
-
-  # Core scientific computing
-  "numpy",
-  "pandas",
-  "scipy",
-  "scikit-learn",
-  "tqdm",
+  # Core scientific computing (not in base image)
+  "numpy>=1.24.0",
+  "pandas>=2.0.0",
+  "scipy>=1.10.0",
+  "scikit-learn>=1.3.0",
+  "tqdm>=4.65.0",
 
   # Hugging Face ecosystem
-  "transformers",
-  "datasets",
-  "accelerate",
-  "safetensors",
-  "sentencepiece",
-  "tokenizers",
+  "transformers>=4.30.0",
+  "datasets>=2.12.0",
+  "accelerate>=0.20.0",
+  "safetensors>=0.3.0",
+  "sentencepiece>=0.1.99",
+  "tokenizers>=0.13.0",
   
   # Image processing
-  "pillow",
-  "albumentations",
+  "pillow>=9.5.0",
+  "albumentations>=1.3.0",
   
   # Visualization
-  "matplotlib",
+  "matplotlib>=3.7.0",
   
   # Jupyter and interactive development
-  "jupyter",
-  "ipykernel",
-  "ipywidgets",
+  "jupyter>=1.0.0",
+  "ipykernel>=6.23.0",
+  "ipywidgets>=8.0.0",
   
   # Configuration and utilities
-  "pyyaml",
-  "requests",
-  "python-dotenv",
-  "rich",
-  "typer",
+  "pyyaml>=6.0",
+  "requests>=2.31.0",
+  "python-dotenv>=1.0.0",
+  "rich>=13.0.0",
+  "typer[all]>=0.9.0",
   
   # GPU monitoring and utilities
-  "nvidia-ml-py"
+  "nvidia-ml-py>=12.535.0"
 ]
 
 [project.optional-dependencies]
@@ -55,159 +54,159 @@ dependencies = [
 # Development tools - code quality and testing
 dev = [
   # Linting and formatting
-  "ruff",
-  "mypy",
+  "ruff>=0.1.0",
+  "mypy>=1.5.0",
   
   # Testing framework
-  "pytest",
-  "pytest-mock",
-  "pytest-asyncio",
-  "pytest-xdist",  # Parallel testing
+  "pytest>=7.4.0",
+  "pytest-mock>=3.11.0",
+  "pytest-asyncio>=0.21.0",
+  "pytest-xdist>=3.3.0",  # Parallel testing
   
   # Type stubs for better type checking
-  "types-requests",
-  "types-PyYAML",
-  "types-pillow",
+  "types-requests>=2.31.0",
+  "types-PyYAML>=6.0.0",
+  "types-pillow>=10.0.0",
   
   # Pre-commit hooks
-  "pre-commit",
+  "pre-commit>=3.3.0",
   
   # Documentation
-  "mkdocs",
-  "mkdocs-material",
+  "mkdocs>=1.5.0",
+  "mkdocs-material>=9.0.0",
 ]
 
 # Extended data science and visualization tools
 datascience = [
-  "seaborn",
-  "plotly",
-  "bokeh",
-  "altair",
+  "seaborn>=0.12.0",
+  "plotly>=5.15.0",
+  "bokeh>=3.2.0",
+  "altair>=5.0.0",
   
   # Advanced data processing
-  "polars",
-  "pyarrow",
-  "fastparquet",
+  "polars>=0.18.0",
+  "pyarrow>=12.0.0",
+  "fastparquet>=2023.7.0",
   
   # Image processing
-  "scikit-image",
-  "opencv-python",
-  "pywavelets",
+  "scikit-image>=0.21.0",
+  "opencv-python>=4.8.0",
+  "pywavelets>=1.4.0",
   
   # Statistical analysis
-  "statsmodels",
-  "pingouin",
+  "statsmodels>=0.14.0",
+  "pingouin>=0.5.0",
 ]
 
 # Jupyter and interactive development
 notebook = [
-  "jupyterlab",
-  "jupyterlab-widgets",
-  "ipdb",
-  "notebook",
+  "jupyterlab>=4.0.0",
+  "jupyterlab-widgets>=3.0.0",
+  "ipdb>=0.13.0",
+  "notebook>=7.0.0",
   
   # Jupyter extensions
-  "jupyterlab-git",
-  "nbconvert",
-  "nbformat",
-  "jupyterlab-nvdashboard",  # GPU monitoring in Jupyter
+  "jupyterlab-git>=0.42.0",
+  "nbconvert>=7.7.0",
+  "nbformat>=5.9.0",
+  "jupyterlab-nvdashboard>=0.8.0",  # GPU monitoring in Jupyter
   
   # Interactive widgets and visualization
-  "ipympl",
-  "plotly",
-  "panel",
+  "ipympl>=0.9.0",
+  "plotly>=5.15.0",
+  "panel>=1.2.0",
 ]
 
 # Experiment tracking and MLOps
 tracking = [
-  "tensorboard",
-  "wandb",
-  "mlflow",
-  "clearml",
+  "tensorboard>=2.13.0",
+  "wandb>=0.15.0",
+  "mlflow>=2.5.0",
+  "clearml>=1.11.0",
   
   # Model versioning and management
-  "dvc",
-  "dvclive",
+  "dvc>=3.0.0",
+  "dvclive>=2.10.0",
 ]
 
 # Data acquisition and external APIs
 data = [
-  "kaggle",
-  "huggingface-hub",
+  "kaggle>=1.5.0",
+  "huggingface-hub>=0.16.0",
   
   # Database connectors
-  "sqlalchemy",
-  "psycopg2-binary",
-  "pymongo",
+  "sqlalchemy>=2.0.0",
+  "psycopg2-binary>=2.9.0",
+  "pymongo>=4.4.0",
   
   # Web scraping and APIs
-  "httpx",
-  "beautifulsoup4",
-  "selenium",
+  "httpx>=0.24.0",
+  "beautifulsoup4>=4.12.0",
+  "selenium>=4.10.0",
 ]
 
 # Performance profiling and debugging tools
 profiling = [
-  "viztracer",
-  "memory-profiler",
-  "py-spy",
-  "line-profiler",
-  "nvitop",           # Advanced GPU monitoring
+  "viztracer>=0.15.0",
+  "memory-profiler>=0.61.0",
+  "py-spy>=0.3.0",
+  "line-profiler>=4.0.0",
+  "nvitop>=1.1.0",           # Advanced GPU monitoring
   
   # GPU profiling
-  "torch-tb-profiler",
-  "nvidia-ml-py",
-  "pynvml",
+  "torch-tb-profiler>=0.4.0",
+  "nvidia-ml-py>=12.535.0",
+  "pynvml>=11.5.0",
 ]
 
 # Security scanning and code analysis
 security = [
-  "safety",
-  "bandit[toml]",
-  "semgrep",
+  "safety>=2.3.0",
+  "bandit[toml]>=1.7.0",
+  "semgrep>=1.30.0",
 ]
 
 # Audio and video processing (optional heavy dependencies)
 media = [
-  "librosa",
-  "soundfile",
-  "av",
-  "ffmpeg-python",
+  "librosa>=0.10.0",
+  "soundfile>=0.12.0",
+  "av>=10.0.0",
+  "ffmpeg-python>=0.2.0",
 ]
 
 # Natural language processing extensions
 nlp = [
-  "spacy",
-  "nltk",
-  "gensim",
-  "textblob",
-  "sentence-transformers",
-  "ftfy",
+  "spacy>=3.6.0",
+  "nltk>=3.8.0",
+  "gensim>=4.3.0",
+  "textblob>=0.17.0",
+  "sentence-transformers>=2.2.0",
+  "ftfy>=6.1.0",
 ]
 
 # Computer vision extensions
 cv = [
-  "ultralytics",
-  "timm",
-  "mmcv",
-  "supervision",
+  "ultralytics>=8.0.0",
+  "timm>=0.9.0",
+  "mmcv>=2.0.0",
+  "supervision>=0.12.0",
 ]
 
 # Reinforcement Learning
 rl = [
-  "gymnasium",
-  "stable-baselines3",
-  "sb3-contrib",
-  "tensorboard",
+  "gymnasium>=0.29.0",
+  "stable-baselines3>=2.0.0",
+  "sb3-contrib>=2.0.0",
+  "tensorboard>=2.13.0",
 ]
 
 # Large Language Models and Text Generation
 llm = [
-  "openai",
-  "anthropic",
-  "langchain",
-  "langchain-community",
-  "chromadb"
+  "openai>=1.0.0",
+  "anthropic>=0.3.0",
+  "langchain>=0.0.200",
+  "langchain-community>=0.0.20",
+  "chromadb>=0.4.0"
 ]
 
 # All extras combined for comprehensive installation
@@ -226,7 +225,7 @@ Changelog = "https://github.com/yourusername/torch-starter/releases"
 torch-starter = "torch_starter.cli:main"
 
 [build-system]
-requires = ["hatchling>=1.25.0", "uv>=0.1.0"]
+requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -239,11 +238,29 @@ path = "torch_starter/__init__.py"
 allow-direct-references = true
 
 # ==============================================================================
+# UV CONFIGURATION - Fast Python package manager with system Python
+# ==============================================================================
+[tool.uv]
+index-strategy = "unsafe-best-match"
+resolution = "highest"
+compile-bytecode = true
+link-mode = "copy"
+concurrent-downloads = 20
+keyring-provider = "subprocess"
+system = true  # Use system Python
+python-downloads = "never"  # Never download Python, use system
+native-tls = true
+
+# Exclude PyTorch packages as they're provided by base image
+exclude-newer = []
+find-links = []
+
+# ==============================================================================
 # RUFF CONFIGURATION - Modern Python linting and formatting
 # ==============================================================================
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 exclude = [
     ".bzr",
     ".direnv", 
@@ -349,7 +366,7 @@ docstring-code-line-length = 88
 # MYPY CONFIGURATION - Static type checking
 # ==============================================================================
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 warn_unused_configs = true
 warn_return_any = true
@@ -539,19 +556,6 @@ directory = "htmlcov"
 output = "coverage.xml"
 
 # ==============================================================================
-# UV CONFIGURATION - Fast Python package manager
-# ==============================================================================
-[tool.uv]
-index-strategy = "unsafe-best-match"
-resolution = "highest"
-compile-bytecode = true
-link-mode = "copy"
-concurrent-downloads = 20
-keyring-provider = "subprocess"
-
-# Note: No extra PyTorch index needed since PyTorch is provided by base image
-
-# ==============================================================================
 # BANDIT CONFIGURATION - Security linting
 # ==============================================================================
 [tool.bandit]
@@ -566,8 +570,8 @@ skips = ["**/test_*.py", "tests/**", "notebooks/**"]
 # ==============================================================================
 [tool.black]
 line-length = 100
-target-version = ['py310']
-include = '\.pyi?'
+target-version = ['py311']
+include = '\.pyi?
   
 extend-exclude = '''
 /(

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Multi-stage build for PyTorch development environment using official PyTorch image
-# Uses PyTorch 2.8.0 with CUDA 12.9 and cuDNN 9 runtime
+# Uses PyTorch 2.8.0 with CUDA 12.9 and cuDNN 9 runtime with system Python and UV
 
 # ==============================================================================
 # PyTorch Base Stage - Official PyTorch image with CUDA runtime
@@ -10,7 +10,6 @@ FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel AS pytorch-base
 
 # Build arguments for cache control and versioning
 ARG BUILDKIT_INLINE_CACHE=1
-ARG PYTHON_VERSION=3.12
 ARG CUDA_VERSION=12.9
 ARG APP_USER=ubuntu
 ARG APP_UID=1000
@@ -18,10 +17,11 @@ ARG APP_GID=1000
 # Configurable CUDA architectures
 ARG TORCH_CUDA_ARCH_LIST=7.0,7.5,8.0,8.6,8.9,9.0
 
-# Verify PyTorch and CUDA installation
+# Verify PyTorch and CUDA installation with system Python
 RUN python -c "import torch; print(f'PyTorch {torch.__version__} with CUDA {torch.version.cuda}')" && \
     python -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()}')" && \
-    echo "PyTorch base image verified"
+    python -c "import sys; print(f'Python {sys.version}')" && \
+    echo "PyTorch base image verified with system Python $(python --version)"
 
 # ==============================================================================
 # System Dependencies Stage - Essential tools and libraries
@@ -64,7 +64,6 @@ RUN if ! id -u ${APP_USER} >/dev/null 2>&1; then \
     useradd -m -u ${APP_UID} -g root -s /bin/bash ${APP_USER}; \
     fi && \
     usermod -aG sudo ${APP_USER} && \
-    # Allow specific sudo commands only for security
     # Create all necessary directories with proper ownership
     mkdir -p \
     /home/${APP_USER}/.cache/huggingface \
@@ -81,7 +80,7 @@ RUN if ! id -u ${APP_USER} >/dev/null 2>&1; then \
     chmod 755 /home/${APP_USER}
 
 # ==============================================================================
-# UV Package Manager Stage - Install UV with optimized caching
+# UV Package Manager Stage - Install UV with system Python
 # ==============================================================================
 FROM user-setup AS uv-install
 
@@ -90,11 +89,12 @@ USER ${APP_USER}
 ENV HOME=/home/${APP_USER}
 WORKDIR /workspaces
 
-# UV installation and configuration
+# UV installation and configuration for system Python
 ENV UV_INSTALL_DIR=/home/${APP_USER}/.local/bin \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
-    UV_PYTHON_DOWNLOADS=manual \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_SYSTEM_PYTHON=1 \
     UV_CONCURRENT_DOWNLOADS=20 \
     UV_HTTP_TIMEOUT=600 \
     PATH=/home/${APP_USER}/.local/bin:${PATH}
@@ -102,12 +102,16 @@ ENV UV_INSTALL_DIR=/home/${APP_USER}/.local/bin \
 # Install UV with cache mounting for faster rebuilds
 RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
     UV_VERSION=0.1.45 curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    uv --version
+    uv --version && \
+    echo "UV installed for system Python usage"
 
 # ==============================================================================
-# Python Environment Stage - Create virtual environment (keep existing Python)
+# Dependencies Installation Stage - Install additional Python packages with UV
 # ==============================================================================
-FROM uv-install AS python-env
+FROM uv-install AS deps-install
+
+# Copy dependency files first for better Docker layer caching
+COPY --chown=${APP_USER}:root pyproject.toml uv.lock* ./
 
 # Python performance environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -119,33 +123,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     MALLOC_ARENA_MAX=2
 
-# Create virtual environment with system site-packages
+# Install dependencies using UV with system Python (excluding torch, torchvision, torchaudio)
 RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
-    python -m venv /workspaces/.venv --system-site-packages && \
-    echo "source /workspaces/.venv/bin/activate" >> ~/.bashrc && \
-    echo "export CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-all}" >> ~/.bashrc
-
-# Set PATH to include virtual environment binaries
-ENV PATH="/workspaces/.venv/bin:$PATH"
-
-# Install PyTorch with cudnn extra to get all development tools
-RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
-    . /workspaces/.venv/bin/activate && \
-    uv pip install --no-deps torch==2.8.0+cu128 --extra-index-url https://download.pytorch.org/whl/cu128
-
-# ==============================================================================
-# Dependencies Installation Stage - Install additional Python packages
-# ==============================================================================
-FROM python-env AS deps-install
-
-# Copy dependency files first for better Docker layer caching
-COPY --chown=${APP_USER}:root pyproject.toml uv.lock* ./
-
-# Install dependencies without torch
-RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
-    . /workspaces/.venv/bin/activate && \
-    uv pip install --no-deps -e . && \
-    echo "Dependencies installed without torch"
+    echo "Installing dependencies with UV using system Python..." && \
+    # First, verify system Python and PyTorch are available
+    python -c "import sys, torch; print(f'Using Python {sys.version}'); print(f'PyTorch {torch.__version__} available')" && \
+    # Install project dependencies using UV with system Python
+    uv pip install --system -e . && \
+    echo "Dependencies installed successfully"
 
 # ==============================================================================
 # Final Application Stage - Install project and setup runtime
@@ -156,27 +141,38 @@ FROM deps-install AS final
 COPY --chown=${APP_USER}:root . .
 
 # Install project in development mode and setup Jupyter kernel
-RUN . .venv/bin/activate && \
-    uv pip install -e . --compile-bytecode && \
-    # Setup Jupyter kernel with project name (using Python 3.12)
+RUN echo "Setting up development environment..." && \
+    # Reinstall project to ensure latest changes are included
+    uv pip install --system -e . --compile-bytecode && \
+    # Get Python version for kernel name
+    PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')") && \
+    # Setup Jupyter kernel with project name
     python -m ipykernel install --user \
-    --name torch_starter-3.12 \
-    --display-name "Python 3.12 (torch_starter)" && \
+    --name "torch_starter-${PYTHON_VERSION}" \
+    --display-name "Python ${PYTHON_VERSION} (torch_starter)" && \
     # Create useful development symlinks
     ln -sf /workspaces/data /home/${APP_USER}/data && \
     ln -sf /workspaces/notebooks /home/${APP_USER}/notebooks && \
     # Create GPU monitoring script
     echo '#!/bin/bash\nwatch -n 1 "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv"' > /home/${APP_USER}/.local/bin/gpu-monitor && \
     chmod +x /home/${APP_USER}/.local/bin/gpu-monitor && \
-    echo "✅ Project setup completed"
+    # Create convenience aliases in bashrc
+    echo 'export PATH=/home/ubuntu/.local/bin:$PATH' >> ~/.bashrc && \
+    echo 'alias uv-install="uv pip install --system"' >> ~/.bashrc && \
+    echo 'alias uv-list="uv pip list --system"' >> ~/.bashrc && \
+    echo 'alias uv-sync="uv pip sync --system"' >> ~/.bashrc && \
+    echo "✅ Project setup completed with UV and system Python"
 
-# Moved verification to runtime
-CMD . .venv/bin/activate && \
+# Runtime verification moved to CMD
+CMD echo "🔍 Verifying environment..." && \
+    python -c "import sys; print(f'✅ Python {sys.version}')" && \
     python -c "import torch; print(f'✅ PyTorch {torch.__version__} - CUDA: {torch.version.cuda}')" && \
     python -c "import torch; print(f'✅ CUDA Available: {torch.cuda.is_available()}')" && \
     python -c "import torch; print(f'✅ CUDA Devices: {torch.cuda.device_count()}')" && \
     python -c "import torchvision; print(f'✅ TorchVision {torchvision.__version__}')" && \
     python -c "import transformers; print(f'✅ Transformers {transformers.__version__}')" && \
+    uv --version && echo "✅ UV package manager ready" && \
+    echo "✅ Environment verification completed" && \
     python verify_setup/gpu_test.py && \
     bash verify_setup/verify_setup.sh && \
     /bin/bash -l
@@ -190,7 +186,7 @@ EXPOSE 8888 8000 6006 7860
 
 # Comprehensive health check that verifies CUDA functionality
 HEALTHCHECK --interval=300s --timeout=30s --start-period=60s --retries=3 \
-    CMD /bin/bash -c ". .venv/bin/activate && python -c \"import torch; print(f'Health check: PyTorch {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); if torch.cuda.is_available(): x = torch.tensor([1.0], device='cuda'); print(f'GPU test: {x.device}'); exit(0); else: exit(1)\"" || exit 1
+    CMD /bin/bash -c "python -c \"import torch; print(f'Health check: PyTorch {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); if torch.cuda.is_available(): x = torch.tensor([1.0], device='cuda'); print(f'GPU test: {x.device}'); exit(0); else: exit(1)\"" || exit 1
 
 # Set up container entrypoint with proper signal handling
 ENTRYPOINT ["/usr/bin/tini", "--"]
@@ -200,13 +196,13 @@ CMD ["/bin/bash", "-l"]
 # Metadata and Labels
 # ==============================================================================
 LABEL org.opencontainers.image.title="torch_starter" \
-    org.opencontainers.image.description="PyTorch 2.8.0 development environment with CUDA 12.9 and Python 3.12" \
+    org.opencontainers.image.description="PyTorch 2.8.0 development environment with CUDA 12.9, UV package manager, and system Python" \
     org.opencontainers.image.version="2.8-cuda${CUDA_VERSION}" \
     org.opencontainers.image.vendor="PyTorch DevContainer" \
     org.opencontainers.image.licenses="MIT" \
     cuda.version="${CUDA_VERSION}" \
     pytorch.version="2.8.0" \
-    python.version="3.12"
+    python.version="system"
 
 # Development environment hints for better IDE integration
 ENV PYTHONPATH=/workspaces:${PYTHONPATH} \
@@ -222,4 +218,7 @@ ENV PYTHONPATH=/workspaces:${PYTHONPATH} \
     MKL_NUM_THREADS=4 \
     OPENBLAS_NUM_THREADS=4 \
     NUMEXPR_NUM_THREADS=4 \
-    TORCH_NUM_THREADS=4
+    TORCH_NUM_THREADS=4 \
+    # UV system integration
+    UV_SYSTEM_PYTHON=1 \
+    UV_PYTHON_DOWNLOADS=never

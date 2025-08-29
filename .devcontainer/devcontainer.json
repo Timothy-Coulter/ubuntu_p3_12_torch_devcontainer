@@ -1,13 +1,11 @@
 {
-  "name": "torch_starter-cuda (PyTorch 2.8.0, CUDA 12.9, uv, Py3.12)",
+  "name": "torch_starter-cuda (PyTorch 2.8.0, CUDA 12.9, UV, System Python)",
   "build": {
     "dockerfile": "Dockerfile",
     "context": "..",
     "options": [
       "--build-arg",
       "BUILDKIT_INLINE_CACHE=1",
-      "--build-arg",
-      "PYTHON_VERSION=3.12",
       "--build-arg",
       "CUDA_VERSION=12.9"
     ]
@@ -37,6 +35,8 @@
     "UV_COMPILE_BYTECODE": "1",
     "UV_CONCURRENT_DOWNLOADS": "20",
     "UV_HTTP_TIMEOUT": "600",
+    "UV_SYSTEM_PYTHON": "1",
+    "UV_PYTHON_DOWNLOADS": "never",
     "PYTHONDONTWRITEBYTECODE": "1",
     "PYTHONUNBUFFERED": "1",
     "PYTHONOPTIMIZE": "1",
@@ -104,10 +104,10 @@
     }
   },
   "postCreateCommand": {
-    "activate-env": "bash -c 'echo \"🐍 Activating Python environment...\" && source .venv/bin/activate && python -c \"import sys; print(f\\\"✅ Python {sys.version}\\\")\" && python -c \"import torch; print(f\\\"🔥 PyTorch {torch.__version__}\\\"); print(f\\\"🚀 CUDA Available: {torch.cuda.is_available()}\\\"); print(f\\\"📱 CUDA Devices: {torch.cuda.device_count()}\\\") if torch.cuda.is_available() else print(\\\"⚠️  CUDA Not Available\\\"); import transformers; print(f\\\"🤗 Transformers {transformers.__version__}\\\")\"'",
+    "activate-env": "bash -c 'echo \"🐍 Using system Python with UV...\" && python -c \"import sys; print(f\\\"✅ Python {sys.version}\\\")\" && python -c \"import torch; print(f\\\"🔥 PyTorch {torch.__version__}\\\"); print(f\\\"🚀 CUDA Available: {torch.cuda.is_available()}\\\"); print(f\\\"📱 CUDA Devices: {torch.cuda.device_count()}\\\") if torch.cuda.is_available() else print(\\\"⚠️  CUDA Not Available\\\"); import transformers; print(f\\\"🤗 Transformers {transformers.__version__}\\\")\" && uv --version && echo \"📦 UV Package Manager ready\"'",
     "setup-git": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}",
     "verify-cuda": "bash -c 'if command -v nvidia-smi >/dev/null 2>&1; then echo \"🖥️  GPU Information:\"; nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader; echo \"📊 GPU Driver Info:\"; nvidia-smi --query-gpu=driver_version --format=csv,noheader; else echo \"⚠️  nvidia-smi not available - GPU may not be accessible\"; fi'",
-    "setup-aliases": "echo 'alias gpu-monitor=\"watch -n 1 \\\"nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv\\\"\"' >> ~/.bashrc && echo 'alias gpu-info=\"nvidia-smi --query-gpu=name,memory.total,compute_cap,driver_version --format=csv\"' >> ~/.bashrc && echo 'alias torch-info=\"python -c \\\"import torch; print(f\\\"PyTorch: {torch.__version__}\\\"); print(f\\\"CUDA: {torch.version.cuda}\\\"); print(f\\\"cuDNN: {torch.backends.cudnn.version()}\\\"); print(f\\\"Devices: {torch.cuda.device_count()}\\\")\\\"\"' >> ~/.bashrc"
+    "setup-aliases": "echo 'alias gpu-monitor=\"watch -n 1 \\\"nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv\\\"\"' >> ~/.bashrc && echo 'alias gpu-info=\"nvidia-smi --query-gpu=name,memory.total,compute_cap,driver_version --format=csv\"' >> ~/.bashrc && echo 'alias torch-info=\"python -c \\\"import torch; print(f\\\"PyTorch: {torch.__version__}\\\"); print(f\\\"CUDA: {torch.version.cuda}\\\"); print(f\\\"cuDNN: {torch.backends.cudnn.version()}\\\"); print(f\\\"Devices: {torch.cuda.device_count()}\\\")\\\"\"' >> ~/.bashrc && echo 'alias uv-install=\"uv pip install --system\"' >> ~/.bashrc && echo 'alias uv-list=\"uv pip list --system\"' >> ~/.bashrc && echo 'alias uv-sync=\"uv pip sync --system\"' >> ~/.bashrc"
   },
   "customizations": {
     "vscode": {
@@ -129,8 +129,8 @@
         "ms-vscode.vscode-json"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python",
-        "python.terminal.activateEnvironment": true,
+        "python.defaultInterpreterPath": "/opt/conda/bin/python",
+        "python.terminal.activateEnvironment": false,
         "python.analysis.typeCheckingMode": "basic",
         "python.analysis.autoImportCompletions": true,
         "python.analysis.indexing": true,
@@ -175,7 +175,6 @@
           "**/*.log": true
         },
         "search.exclude": {
-          "**/.venv": true,
           "**/__pycache__": true,
           "**/.mypy_cache": true,
           "**/.ruff_cache": true,
@@ -184,7 +183,6 @@
           "**/logs": true
         },
         "files.exclude": {
-          "**/.venv": false,
           "**/__pycache__": true,
           "**/.mypy_cache": true,
           "**/.ruff_cache": true,
@@ -194,15 +192,17 @@
         "terminal.integrated.shellIntegration.enabled": true,
         "terminal.integrated.env.linux": {
           "CUDA_VISIBLE_DEVICES": "all",
-          "PYTORCH_CUDA_ALLOC_CONF": "max_split_size_mb:512,garbage_collection_threshold:0.6"
+          "PYTORCH_CUDA_ALLOC_CONF": "max_split_size_mb:512,garbage_collection_threshold:0.6",
+          "UV_SYSTEM_PYTHON": "1",
+          "UV_PYTHON_DOWNLOADS": "never"
         },
         "jupyter.askForKernelRestart": false,
-        "jupyter.defaultKernel": "torch_starter-3.12",
+        "jupyter.defaultKernel": "torch_starter-3.11",
         "notebook.experimental.openGettingStarted": false,
         "notebook.kernelProviderAssociations": [
           {
             "viewType": "jupyter-notebook",
-            "kernelspec": "torch_starter-3.12"
+            "kernelspec": "torch_starter-3.11"
           }
         ],
         "git.enableSmartCommit": true,
@@ -247,7 +247,9 @@
   "remoteEnv": {
     "ROO_CONFIG_PATH": "/workspaces/${localWorkspaceFolderBasename}/.roo/roo.json",
     "MCP_SERVERS_CONFIG": "/workspaces/${localWorkspaceFolderBasename}/.mcp/servers.json",
-    "CUDA_VISIBLE_DEVICES": "all"
+    "CUDA_VISIBLE_DEVICES": "all",
+    "UV_SYSTEM_PYTHON": "1",
+    "UV_PYTHON_DOWNLOADS": "never"
   },
   "shutdownAction": "stopContainer",
   "hostRequirements": {
@@ -262,8 +264,8 @@
   "securityOpt": [
     "seccomp=unconfined"
   ],
-  "onCreateCommand": "echo '🏗️  Container created successfully - Setting up PyTorch 2.8.0 + CUDA 12.9 environment...'",
-  "updateContentCommand": "echo '🔄 Content updated - Verifying Python environment...' && source .venv/bin/activate && python -c 'import torch; print(f\"✅ Environment ready - PyTorch {torch.__version__} CUDA: {torch.cuda.is_available()}\")'",
-  "postStartCommand": "echo '🚀 Development environment ready!' && echo '💡 Use \"gpu-monitor\" to monitor GPU usage' && echo '💡 Use \"torch-info\" to check PyTorch CUDA status'",
+  "onCreateCommand": "echo '🏗️  Container created successfully - Setting up PyTorch 2.8.0 + CUDA 12.9 with UV and system Python...'",
+  "updateContentCommand": "echo '🔄 Content updated - Verifying system Python environment...' && python -c 'import torch; print(f\"✅ Environment ready - PyTorch {torch.__version__} CUDA: {torch.cuda.is_available()}\")' && uv --version",
+  "postStartCommand": "echo '🚀 Development environment ready with UV!' && echo '💡 Use \"gpu-monitor\" to monitor GPU usage' && echo '💡 Use \"torch-info\" to check PyTorch CUDA status' && echo '💡 Use \"uv-install <package>\" to install packages with UV'",
   "waitFor": "postCreateCommand"
 }
