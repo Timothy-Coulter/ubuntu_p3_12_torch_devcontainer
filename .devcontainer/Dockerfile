@@ -6,11 +6,11 @@
 # ==============================================================================
 # PyTorch Base Stage - Official PyTorch image with CUDA runtime
 # ==============================================================================
-FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime AS pytorch-base
+FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel AS pytorch-base
 
 # Build arguments for cache control and versioning
 ARG BUILDKIT_INLINE_CACHE=1
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.12
 ARG CUDA_VERSION=12.9
 ARG APP_USER=ubuntu
 ARG APP_UID=1000
@@ -119,11 +119,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     MALLOC_ARENA_MAX=2
 
-# Create virtual environment using existing Python from PyTorch image
+# Create virtual environment with system site-packages
 RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
-    python -m venv .venv && \
+    python -m venv /workspaces/.venv --system-site-packages && \
     echo "source /workspaces/.venv/bin/activate" >> ~/.bashrc && \
     echo "export CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-all}" >> ~/.bashrc
+
+# Set PATH to include virtual environment binaries
+ENV PATH="/workspaces/.venv/bin:$PATH"
+
+# Install PyTorch with cudnn extra to get all development tools
+RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
+    . /workspaces/.venv/bin/activate && \
+    uv pip install --no-deps torch==2.8.0+cu128 --extra-index-url https://download.pytorch.org/whl/cu128
 
 # ==============================================================================
 # Dependencies Installation Stage - Install additional Python packages
@@ -133,15 +141,11 @@ FROM python-env AS deps-install
 # Copy dependency files first for better Docker layer caching
 COPY --chown=${APP_USER}:root pyproject.toml uv.lock* ./
 
-# Install project dependencies including torchvision and transformers
+# Install dependencies without torch
 RUN --mount=type=cache,target=/home/${APP_USER}/.cache/uv,uid=${APP_UID},gid=0 \
-    . .venv/bin/activate && \
-    uv pip install . --compile-bytecode && \
-    # Explicitly install transformers with its dependencies
-    uv pip install transformers --compile-bytecode && \
-    # Explicitly install torchvision with its dependencies
-    uv pip install torchvision --compile-bytecode && \
-    echo "All dependencies installed successfully"
+    . /workspaces/.venv/bin/activate && \
+    uv pip install --no-deps -e . && \
+    echo "Dependencies installed without torch"
 
 # ==============================================================================
 # Final Application Stage - Install project and setup runtime

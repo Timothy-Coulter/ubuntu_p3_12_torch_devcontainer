@@ -68,7 +68,7 @@ check_python_version() {
     return 1
   fi
   
-  pass "Python 3.12 verified"
+  pass "Python 3.11.13 verified"
   
   # Check if it's in virtual environment
   if "$py" -c 'import sys; sys.exit(0 if hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix) else 1)' 2>/dev/null; then

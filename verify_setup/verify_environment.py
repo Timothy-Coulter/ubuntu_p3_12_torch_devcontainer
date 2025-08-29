@@ -72,16 +72,16 @@ class EnvironmentVerifier:
         
         # Python version
         python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-        expected_version = "3.12"
-        version_ok = python_version.startswith(expected_version)
+        expected_version = "3.11.13"
+        version_ok = python_version == expected_version
         
-        self.log_result(category, "python_version", version_ok, 
-                       f"Expected: {expected_version}.x, Got: {python_version}", python_version)
+        self.log_result(category, "python_version", version_ok,
+                       f"Expected: {expected_version}, Got: {python_version}", python_version)
         
         if version_ok:
             console.print(f"✅ Python version: {python_version}")
         else:
-            console.print(f"❌ Python version: {python_version} (expected {expected_version}.x)", style="red")
+            console.print(f"❌ Python version: {python_version} (expected {expected_version})", style="red")
             all_passed = False
         
         # Virtual environment
@@ -121,9 +121,8 @@ class EnvironmentVerifier:
         category = "ml_packages"
         all_passed = True
         
-        # Required packages with version checks
+        # Required packages with version checks (torch removed as it's provided by system)
         required_packages = {
-            "torch": ">=2.0.0",
             "torchvision": ">=0.15.0",
             "transformers": ">=4.44.0",
             "numpy": ">=1.26.0",
@@ -139,15 +138,46 @@ class EnvironmentVerifier:
                 
                 # Simple version check (just check if module loads)
                 import_ok = True
-                self.log_result(category, f"{package_name}_import", import_ok, 
+                self.log_result(category, f"{package_name}_import", import_ok,
                                f"Version: {version}", version)
                 console.print(f"✅ {package_name}: {version}")
                 
             except ImportError as e:
-                self.log_result(category, f"{package_name}_import", False, 
+                self.log_result(category, f"{package_name}_import", False,
                                f"Import error: {str(e)}", "Not available")
                 console.print(f"❌ {package_name}: Import failed - {e}", style="red")
                 all_passed = False
+        
+        # Explicitly check torch availability in virtual environment
+        try:
+            import torch
+            torch_version = torch.__version__
+            cuda_available = torch.cuda.is_available()
+            cuda_version = torch.version.cuda if cuda_available else "N/A"
+            
+            self.log_result(category, "torch_available", True,
+                           f"Version: {torch_version}, CUDA: {cuda_version}", torch_version)
+            console.print(f"✅ torch: {torch_version} (CUDA: {cuda_version})")
+            
+            # Check CUDA library paths reference system libraries
+            cuda_paths = torch.utils.cpp_extension.library_paths(cuda=True)
+            system_cuda_path = "/usr/local/cuda"
+            using_system_libs = any(system_cuda_path in path for path in cuda_paths)
+            
+            self.log_result(category, "cuda_system_paths", using_system_libs,
+                           f"CUDA paths: {cuda_paths}", str(using_system_libs))
+            
+            if using_system_libs:
+                console.print(f"✅ CUDA paths reference system libraries: {system_cuda_path}")
+            else:
+                console.print(f"⚠️  CUDA paths do not reference system libraries: {cuda_paths}", style="yellow")
+                all_passed = False
+                
+        except ImportError:
+            self.log_result(category, "torch_available", False,
+                           "Torch not found in virtual environment", "Not available")
+            console.print("❌ torch: Not found in virtual environment", style="red")
+            all_passed = False
         
         return all_passed
     

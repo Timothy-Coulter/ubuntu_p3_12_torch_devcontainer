@@ -2,7 +2,7 @@
 name = "torch-starter"
 version = "0.1.0"
 description = "PyTorch 2.8.0 deep learning development environment with CUDA 12.9 support using uv and VS Code Dev Containers."
-requires-python = ">=3.10"
+requires-python = "==3.11.13"
 license = { text = "MIT" }
 authors = [{ name = "Your Name", email = "your.email@domain.com" }]
 maintainers = [{ name = "Your Name", email = "your.email@domain.com" }]
