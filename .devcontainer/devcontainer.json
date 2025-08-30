@@ -1,5 +1,5 @@
 {
-  "name": "torch_starter-cuda-volume (PyTorch 2.8.0, CUDA 12.9, UV, System Python)",
+  "name": "torch_starter-cuda-volume-enhanced (PyTorch 2.8.0, CUDA 12.9, UV, System Python)",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".",
@@ -7,13 +7,16 @@
       "--build-arg",
       "BUILDKIT_INLINE_CACHE=1",
       "--build-arg",
-      "CUDA_VERSION=12.9"
+      "CUDA_VERSION=12.9",
+      "--build-arg",
+      "PYTORCH_VERSION=2.8.0",
+      "--platform=linux/amd64"
     ]
   },
   "runArgs": [
     "--gpus",
     "all",
-    "--shm-size=8g",
+    "--shm-size=16g",
     "--ulimit",
     "memlock=-1",
     "--ulimit",
@@ -22,7 +25,11 @@
     "SYS_PTRACE",
     "--security-opt",
     "seccomp=unconfined",
-    "--ipc=host"
+    "--ipc=host",
+    "--memory=32g",
+    "--memory-swap=40g",
+    "--oom-kill-disable=false",
+    "--device-cgroup-rule=c 195:* rmw"
   ],
   "containerUser": "ubuntu",
   "workspaceFolder": "/workspaces/torch-starter",
@@ -38,20 +45,30 @@
     "UV_HTTP_TIMEOUT": "600",
     "UV_SYSTEM_PYTHON": "1",
     "UV_PYTHON_DOWNLOADS": "never",
+    "UV_CACHE_DIR": "/home/ubuntu/.cache/uv",
     "PYTHONDONTWRITEBYTECODE": "1",
     "PYTHONUNBUFFERED": "1",
     "PYTHONOPTIMIZE": "1",
+    "PYTHONFAULTHANDLER": "1",
+    "PYTHONHASHSEED": "random",
     "CUDA_VERSION": "12.9",
+    "PYTORCH_VERSION": "2.8.0",
     "CUDA_VISIBLE_DEVICES": "all",
     "NVIDIA_VISIBLE_DEVICES": "all",
     "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
     "NVIDIA_REQUIRE_CUDA": "cuda>=12.9",
     "TORCH_CUDA_ARCH_LIST": "7.0;7.5;8.0;8.6;8.9;9.0",
     "FORCE_CUDA": "1",
-    "PYTORCH_CUDA_ALLOC_CONF": "max_split_size_mb:512,garbage_collection_threshold:0.6",
+    "PYTORCH_CUDA_ALLOC_CONF": "max_split_size_mb:1024,garbage_collection_threshold:0.6,expandable_segments:True",
     "CUDA_LAUNCH_BLOCKING": "0",
-    "MALLOC_ARENA_MAX": "2",
-    "WORKSPACE_NAME": "torch-starter"
+    "CUDA_CACHE_DISABLE": "0",
+    "CUDA_CACHE_MAXSIZE": "2147483648",
+    "MALLOC_ARENA_MAX": "4",
+    "MALLOC_MMAP_THRESHOLD_": "131072",
+    "MALLOC_TRIM_THRESHOLD_": "131072",
+    "WORKSPACE_NAME": "torch-starter",
+    "DEVELOPMENT_MODE": "1",
+    "CONTAINER_ENHANCED": "true"
   },
   "mounts": [
     {
@@ -93,12 +110,15 @@
   "initializeCommand": [
     "bash",
     "-c",
-    "echo '🏗️  Initializing Docker volumes for volume-based development...' && docker volume create torch-starter-workspace 2>/dev/null || true; docker volume create torch-starter-hf-cache 2>/dev/null || true; docker volume create torch-starter-torch-cache 2>/dev/null || true; docker volume create torch-starter-kaggle-cache 2>/dev/null || true; docker volume create torch-starter-data 2>/dev/null || true; docker volume create torch-starter-uv-cache 2>/dev/null || true; docker volume create torch-starter-pip-cache 2>/dev/null || true; docker volume create torch-starter-models 2>/dev/null || true; echo '✅ Docker volumes ready for torch-starter'"
+    "echo '🏗️  Initializing Docker volumes with proper permissions...' && docker volume create torch-starter-workspace 2>/dev/null || true && docker volume create torch-starter-hf-cache 2>/dev/null || true && docker volume create torch-starter-torch-cache 2>/dev/null || true && docker volume create torch-starter-kaggle-cache 2>/dev/null || true && docker volume create torch-starter-data 2>/dev/null || true && docker volume create torch-starter-uv-cache 2>/dev/null || true && docker volume create torch-starter-pip-cache 2>/dev/null || true && docker volume create torch-starter-models 2>/dev/null || true && echo '✅ Docker volumes ready for torch-starter' && echo '🔧 Setting up volume permissions...' && for vol in torch-starter-workspace torch-starter-hf-cache torch-starter-torch-cache torch-starter-kaggle-cache torch-starter-data torch-starter-uv-cache torch-starter-pip-cache torch-starter-models; do docker run --rm -v $vol:/vol alpine:latest chown -R 1000:1000 /vol 2>/dev/null || echo \"  ⚠️  Could not set permissions for $vol (may be normal)\"; done && echo '✅ Volume permissions configured'"
   ],
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "configureZshAsDefaultShell": true,
-      "upgradePackages": false
+      "upgradePackages": false,
+      "username": "ubuntu",
+      "userUid": 1000,
+      "userGid": 1000
     },
     "ghcr.io/devcontainers/features/git:1": {
       "ppa": false,
@@ -106,37 +126,47 @@
     }
   },
   "postCreateCommand": {
-    "clone-and-setup": "bash -c 'if [ ! -f \"/workspaces/torch-starter/pyproject.toml\" ]; then echo \"🔄 Repository not found, cloning...\"; cd /workspaces && rm -rf torch-starter/* torch-starter/.[!.]* 2>/dev/null || true; git clone https://github.com/yourusername/torch-starter.git /tmp/torch-starter && cp -r /tmp/torch-starter/* /tmp/torch-starter/.[!.]* /workspaces/torch-starter/ 2>/dev/null || true && rm -rf /tmp/torch-starter; fi'",
-    "verify-environment": "bash -c 'cd /workspaces/torch-starter && echo \"🐍 Using system Python with UV...\" && python -c \"import sys; print(f\\\"✅ Python {sys.version}\\\")\" && python -c \"import torch; print(f\\\"🔥 PyTorch {torch.__version__}\\\"); print(f\\\"🚀 CUDA Available: {torch.cuda.is_available()}\\\"); print(f\\\"📱 CUDA Devices: {torch.cuda.device_count()}\\\") if torch.cuda.is_available() else print(\\\"⚠️  CUDA Not Available\\\")\" && uv --version && echo \"📦 UV Package Manager ready\"'",
-    "install-project": "bash -c 'cd /workspaces/torch-starter && if [ -f \"pyproject.toml\" ]; then echo \"📦 Installing project dependencies...\"; uv pip install --system -e .; echo \"✅ Project dependencies installed\"; else echo \"⚠️  pyproject.toml not found, skipping project installation\"; fi'",
-    "setup-jupyter-kernel": "bash -c 'cd /workspaces/torch-starter && PYTHON_VERSION=$(python -c \"import sys; print(f\\\"{sys.version_info.major}.{sys.version_info.minor}\\\")\" 2>/dev/null || echo \"3.11\") && python -m ipykernel install --user --name \"torch_starter-${PYTHON_VERSION}\" --display-name \"Python ${PYTHON_VERSION} (torch_starter)\" 2>/dev/null || echo \"Jupyter kernel setup will be done after project installation\"'",
-    "setup-git": "bash -c 'cd /workspaces/torch-starter && git config --global --add safe.directory /workspaces/torch-starter'",
-    "verify-cuda": "bash -c 'if command -v nvidia-smi >/dev/null 2>&1; then echo \"🖥️  GPU Information:\"; nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader; echo \"📊 GPU Driver Info:\"; nvidia-smi --query-gpu=driver_version --format=csv,noheader; else echo \"⚠️  nvidia-smi not available - GPU may not be accessible\"; fi'"
+    "welcome": "echo '🚀 Enhanced PyTorch DevContainer Starting...'",
+    "verify-volumes": "bash -c 'echo \"📁 Verifying volume mounts...\"; ls -la /workspaces/torch-starter/ && echo \"✅ Workspace volume mounted\" || echo \"⚠️  Workspace volume issue\"'",
+    "clone-and-setup": "bash -c 'if [ ! -f \"/workspaces/torch-starter/pyproject.toml\" ]; then echo \"🔄 Repository not found, cloning...\"; cd /workspaces && rm -rf torch-starter/* torch-starter/.[!.]* 2>/dev/null || true; git clone https://github.com/yourusername/torch-starter.git /tmp/torch-starter && cp -r /tmp/torch-starter/* /tmp/torch-starter/.[!.]* /workspaces/torch-starter/ 2>/dev/null || true && rm -rf /tmp/torch-starter && echo \"✅ Repository cloned\"; else echo \"✅ Repository already present\"; fi'",
+    "verify-environment": "bash -c 'cd /workspaces/torch-starter && echo \"🐍 Using system Python with UV...\" && python -c \"import sys; print(f\\\"✅ Python {sys.version.split()[0]}\\\")\" && python -c \"import torch; print(f\\\"🔥 PyTorch {torch.__version__}\\\"); print(f\\\"🚀 CUDA Available: {torch.cuda.is_available()}\\\"); print(f\\\"📱 CUDA Devices: {torch.cuda.device_count()}\\\") if torch.cuda.is_available() else print(\\\"⚠️  CUDA Not Available - CPU mode only\\\")\" && uv --version && echo \"📦 UV Package Manager ready\"'",
+    "install-project": "bash -c 'cd /workspaces/torch-starter && if [ -f \"pyproject.toml\" ]; then echo \"📦 Installing project dependencies...\"; timeout 300 uv pip install --system -e . || echo \"⚠️  Installation timeout or failed - you may need to run manually\"; echo \"✅ Project dependencies installation attempted\"; else echo \"⚠️  pyproject.toml not found, skipping project installation\"; fi'",
+    "setup-jupyter-kernel": "bash -c 'cd /workspaces/torch-starter && PYTHON_VERSION=$(python -c \"import sys; print(f\\\"{sys.version_info.major}.{sys.version_info.minor}\\\")\" 2>/dev/null || echo \"3.11\") && python -m ipykernel install --user --name \"torch_starter-${PYTHON_VERSION}\" --display-name \"Python ${PYTHON_VERSION} (torch_starter)\" 2>/dev/null || echo \"⚠️  Jupyter kernel setup will be done after project installation\"'",
+    "setup-git": "bash -c 'cd /workspaces/torch-starter && git config --global --add safe.directory /workspaces/torch-starter && git config --global init.defaultBranch main 2>/dev/null || true'",
+    "verify-cuda": "bash -c 'if command -v nvidia-smi >/dev/null 2>&1; then echo \"🖥️  GPU Information:\"; timeout 10 nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader 2>/dev/null || echo \"GPU query timeout - GPU may not be available\"; echo \"📊 GPU Driver Info:\"; timeout 5 nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo \"Driver query timeout\"; else echo \"⚠️  nvidia-smi not available - GPU may not be accessible (normal for CPU-only setups)\"; fi'",
+    "create-env-template": "bash -c 'cd /workspaces/torch-starter && if [ ! -f \".env.local\" ] && [ -f \".env.example\" ]; then echo \"📝 Creating .env.local template from .env.example...\"; cp .env.example .env.local && chmod 600 .env.local && echo \"✅ .env.local created (edit with your API keys)\"; fi'",
+    "final-check": "bash -c 'cd /workspaces/torch-starter && echo \"🔍 Final environment check...\" && python -c \"import torch, transformers, datasets; print(f\\\"✅ Core libraries: PyTorch {torch.__version__}, Transformers {transformers.__version__}, Datasets {datasets.__version__}\\\")\" 2>/dev/null || echo \"⚠️  Some core libraries may not be available yet - run install-project if needed\"'"
   },
-  "postStartCommand": "bash -c 'cd /workspaces/torch-starter && echo \"🚀 Volume-based development environment ready!\" && echo \"💡 Workspace: $(pwd)\" && echo \"💡 Use \\\"uv-install <package>\\\" to install packages\" && echo \"💡 Use \\\"gpu-monitor\\\" for GPU monitoring\" && if [ -f \"pyproject.toml\" ]; then echo \"✅ Project ready for development\"; else echo \"⚠️  Clone your repository into this volume to get started\"; fi'",
+  "postStartCommand": "bash -c 'cd /workspaces/torch-starter && echo \"🚀 Enhanced volume-based development environment ready!\" && echo \"💡 Workspace: $(pwd)\" && echo \"💡 Use \\\"uv-install <package>\\\" to install packages\" && echo \"💡 Use \\\"gpu-monitor\\\" for GPU monitoring\" && echo \"💡 Use \\\"system-info\\\" for diagnostics\" && if [ -f \"pyproject.toml\" ]; then echo \"✅ Project ready for development\"; else echo \"⚠️  Clone your repository into this volume to get started\"; fi && echo \"🔧 Run ./dev.sh verify-setup for comprehensive diagnostics\"'",
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
+        "ms-python.debugpy",
         "ms-toolsai.jupyter",
+        "ms-toolsai.vscode-ai-remote",
+        "ms-toolsai.tensorboard",
         "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
         "eamodio.gitlens",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
         "EditorConfig.EditorConfig",
         "ms-azuretools.vscode-docker",
         "RooVeterinaryInc.roo-cline",
         "mechatroner.rainbow-csv",
         "gaogaotiantian.viztracer-vscode",
         "bierner.markdown-mermaid",
-        "ms-toolsai.vscode-ai-remote",
-        "GitHub.copilot",
-        "ms-python.debugpy",
-        "ms-vscode.vscode-json"
+        "redhat.vscode-yaml",
+        "ms-vscode.vscode-json",
+        "formulahendry.code-runner",
+        "ms-vscode.hexeditor"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/opt/conda/bin/python",
         "python.terminal.activateEnvironment": false,
-        "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.typeCheckingMode": "strict",
         "python.analysis.autoImportCompletions": true,
         "python.analysis.indexing": true,
         "python.analysis.extraPaths": [
@@ -158,12 +188,19 @@
           {
             "name": "datasets",
             "depth": 2
+          },
+          {
+            "name": "numpy",
+            "depth": 2
           }
         ],
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
         "python.testing.pytestArgs": [
-          "tests"
+          "tests",
+          "--no-header",
+          "--tb=short",
+          "-q"
         ],
         "ruff.enable": true,
         "ruff.organizeImports": true,
@@ -180,7 +217,11 @@
           "**/.cache/**": true,
           "**/data/**": true,
           "**/logs/**": true,
-          "**/*.log": true
+          "**/models/**": true,
+          "**/checkpoints/**": true,
+          "**/*.log": true,
+          "**/*.bin": true,
+          "**/*.safetensors": true
         },
         "search.exclude": {
           "**/__pycache__": true,
@@ -188,7 +229,9 @@
           "**/.ruff_cache": true,
           "**/.cache": true,
           "**/data": true,
-          "**/logs": true
+          "**/logs": true,
+          "**/models": true,
+          "**/checkpoints": true
         },
         "files.exclude": {
           "**/__pycache__": true,
@@ -201,13 +244,16 @@
         "terminal.integrated.cwd": "/workspaces/torch-starter",
         "terminal.integrated.env.linux": {
           "CUDA_VISIBLE_DEVICES": "all",
-          "PYTORCH_CUDA_ALLOC_CONF": "max_split_size_mb:512,garbage_collection_threshold:0.6",
+          "PYTORCH_CUDA_ALLOC_CONF": "max_split_size_mb:1024,garbage_collection_threshold:0.6,expandable_segments:True",
+          "CUDA_LAUNCH_BLOCKING": "0",
           "UV_SYSTEM_PYTHON": "1",
           "UV_PYTHON_DOWNLOADS": "never"
         },
         "jupyter.askForKernelRestart": false,
         "jupyter.defaultKernel": "torch_starter-3.11",
         "jupyter.notebookFileRoot": "/workspaces/torch-starter",
+        "jupyter.enableExtendedKernelCompletions": true,
+        "jupyter.kernels.excludePythonEnvironments": [],
         "notebook.experimental.openGettingStarted": false,
         "notebook.kernelProviderAssociations": [
           {
@@ -218,9 +264,11 @@
         "git.enableSmartCommit": true,
         "git.autofetch": true,
         "git.defaultCloneDirectory": "/workspaces",
+        "git.ignoreLimitWarning": true,
         "extensions.autoUpdate": false,
         "telemetry.telemetryLevel": "off",
         "editor.formatOnSave": true,
+        "editor.inlayHints.enabled": "offUnlessPressed",
         "editor.codeActionsOnSave": {
           "source.organizeImports.ruff": "explicit",
           "source.fixAll.ruff": "explicit"
@@ -249,9 +297,21 @@
         "[dockerfile]": {
           "editor.defaultFormatter": "ms-azuretools.vscode-docker"
         },
+        "[yaml]": {
+          "editor.defaultFormatter": "redhat.vscode-yaml"
+        },
         "debug.console.fontSize": 14,
         "debug.internalConsoleOptions": "openOnSessionStart",
-        "python.analysis.diagnosticMode": "workspace"
+        "debug.allowBreakpointsEverywhere": true,
+        "debug.terminal.clearBeforeReusing": true,
+        "python.analysis.diagnosticMode": "workspace",
+        "tensorboard.logDirectory": "/workspaces/torch-starter/logs",
+        "codeRunner.executorMap": {
+          "python": "cd $dir && python -u $fileName"
+        },
+        "codeRunner.runInTerminal": true,
+        "codeRunner.preserveFocus": false,
+        "codeRunner.clearPreviousOutput": true
       }
     }
   },
@@ -259,7 +319,8 @@
     "CUDA_VISIBLE_DEVICES": "all",
     "UV_SYSTEM_PYTHON": "1",
     "UV_PYTHON_DOWNLOADS": "never",
-    "WORKSPACE_ROOT": "/workspaces/torch-starter"
+    "WORKSPACE_ROOT": "/workspaces/torch-starter",
+    "PYTHONPATH": "/workspaces/torch-starter"
   },
   "shutdownAction": "stopContainer",
   "hostRequirements": {
@@ -274,7 +335,7 @@
   "securityOpt": [
     "seccomp=unconfined"
   ],
-  "onCreateCommand": "echo '🏗️  Container created for volume-based development - PyTorch 2.8.0 + CUDA 12.9 with UV and system Python...'",
-  "updateContentCommand": "bash -c 'cd /workspaces/torch-starter 2>/dev/null || cd /workspaces && echo \"🔄 Content updated - Verifying system Python environment...\" && python -c \"import torch; print(f\\\"✅ Environment ready - PyTorch {torch.__version__} CUDA: {torch.cuda.is_available()}\\\")\" && uv --version'",
+  "onCreateCommand": "echo '🏗️  Enhanced container created for volume-based development - PyTorch 2.8.0 + CUDA 12.9 with UV and system Python...'",
+  "updateContentCommand": "bash -c 'cd /workspaces/torch-starter 2>/dev/null || cd /workspaces && echo \"🔄 Content updated - Verifying enhanced system Python environment...\" && python -c \"import torch; print(f\\\"✅ Environment ready - PyTorch {torch.__version__} CUDA: {torch.cuda.is_available()}\\\")\" && uv --version && echo \"🚀 Enhanced DevContainer ready!\"'",
   "waitFor": "postCreateCommand"
 }

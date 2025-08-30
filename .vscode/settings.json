@@ -33,5 +33,6 @@
       "viewType": "jupyter-notebook",
       "kernelspec": "torch_starter-3.12"
     }
-  ]
+  ],
+  "terminal.integrated.scrollback": 25000
 }

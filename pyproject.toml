@@ -6,21 +6,21 @@ requires-python = ">=3.11.0"
 license = { text = "MIT" }
 authors = [{ name = "Your Name", email = "your.email@domain.com" }]
 maintainers = [{ name = "Your Name", email = "your.email@domain.com" }]
-keywords = ["deep-learning", "pytorch", "transformers", "cuda", "gpu", "uv", "devcontainer"]
+keywords = ["deep-learning", "pytorch", "transformers", "cuda", "gpu", "uv", "devcontainer", "cuda-12.9"]
 
-# Core dependencies - PyTorch ecosystem is provided by the base image (pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel)
+# Core dependencies - PyTorch ecosystem is provided by the base image (pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime)
 # Only additional packages that are not in the base image are listed here
 dependencies = [
   # Core scientific computing (not in base image)
   "numpy>=1.24.0",
   "pandas>=2.0.0",
-  "scipy>=1.10.0",
+  "scipy>=1.10.0", 
   "scikit-learn>=1.3.0",
   "tqdm>=4.65.0",
 
   # Hugging Face ecosystem
   "transformers>=4.30.0",
-  "datasets>=2.12.0",
+  "datasets>=2.12.0", 
   "accelerate>=0.20.0",
   "safetensors>=0.3.0",
   "sentencepiece>=0.1.99",
@@ -62,6 +62,7 @@ dev = [
   "pytest-mock>=3.11.0",
   "pytest-asyncio>=0.21.0",
   "pytest-xdist>=3.3.0",  # Parallel testing
+  "pytest-cov>=4.1.0",    # Coverage support
   
   # Type stubs for better type checking
   "types-requests>=2.31.0",
@@ -74,6 +75,10 @@ dev = [
   # Documentation
   "mkdocs>=1.5.0",
   "mkdocs-material>=9.0.0",
+  
+  # Enhanced development tools
+  "ipdb>=0.13.0",
+  "pdbpp>=0.10.0",
 ]
 
 # Extended data science and visualization tools
@@ -157,6 +162,10 @@ profiling = [
   "torch-tb-profiler>=0.4.0",
   "nvidia-ml-py>=12.535.0",
   "pynvml>=11.5.0",
+  
+  # Enhanced profiling
+  "scalene>=1.5.0",         # CPU, GPU, and memory profiler
+  "pyinstrument>=4.4.0",    # Statistical profiler
 ]
 
 # Security scanning and code analysis
@@ -164,6 +173,7 @@ security = [
   "safety>=2.3.0",
   "bandit[toml]>=1.7.0",
   "semgrep>=1.30.0",
+  "pip-audit>=2.6.0",       # Vulnerability scanner
 ]
 
 # Audio and video processing (optional heavy dependencies)
@@ -190,6 +200,10 @@ cv = [
   "timm>=0.9.0",
   "mmcv>=2.0.0",
   "supervision>=0.12.0",
+  
+  # Enhanced computer vision
+  "kornia>=0.7.0",          # Computer vision library for PyTorch
+  "albumentations>=1.3.0",  # Image augmentation
 ]
 
 # Reinforcement Learning
@@ -206,12 +220,30 @@ llm = [
   "anthropic>=0.3.0",
   "langchain>=0.0.200",
   "langchain-community>=0.0.20",
-  "chromadb>=0.4.0"
+  "chromadb>=0.4.0",
+  
+  # Enhanced LLM tools
+  "tiktoken>=0.5.0",        # OpenAI tokenizer
+  "guidance>=0.1.0",        # Language model programming
+]
+
+# CUDA-specific packages (only install if CUDA is available)
+cuda = [
+  # These will be installed conditionally based on CUDA availability
+  "cupy-cuda12x>=12.0.0",   # CUDA 12.x support for CuPy
+  "nvidia-ml-py>=12.535.0",
+  "pynvml>=11.5.0",
+  "nvitop>=1.1.0",
 ]
 
 # All extras combined for comprehensive installation
 all = [
   "torch-starter[dev,datascience,notebook,tracking,data,profiling,security,media,nlp,cv,rl,llm]"
+]
+
+# CUDA-enabled full installation 
+all-cuda = [
+  "torch-starter[all,cuda]"
 ]
 
 [project.urls]
@@ -251,9 +283,24 @@ system = true  # Use system Python
 python-downloads = "never"  # Never download Python, use system
 native-tls = true
 
+# Enhanced UV configuration for CUDA environment
+cache-dir = "/home/ubuntu/.cache/uv"
+cuda-version = "12.9"  # Match container CUDA version
+python-version = "3.11"  # Match system Python version
+
 # Exclude PyTorch packages as they're provided by base image
 exclude-newer = []
 find-links = []
+
+# Enhanced dependency resolution for ML packages
+[tool.uv.pip]
+# Allow pre-releases for cutting-edge ML packages
+prerelease = "if-necessary"
+
+# Enhanced index URLs for ML packages
+extra-index-url = [
+    "https://download.pytorch.org/whl/cu121",  # PyTorch CUDA wheels (backup)
+]
 
 # ==============================================================================
 # RUFF CONFIGURATION - Modern Python linting and formatting
@@ -310,6 +357,7 @@ select = [
     "PD",     # pandas-vet
     "NPY",    # numpy specific rules
     "PERF",   # performance improvements
+    "FURB",   # refurb (modernization)
 ]
 
 ignore = [
@@ -335,7 +383,7 @@ max-complexity = 12
 
 [tool.ruff.lint.isort]
 known-first-party = ["torch_starter"]
-known-third-party = ["torch", "transformers", "datasets", "numpy", "pandas", "matplotlib", "cv2", "PIL"]
+known-third-party = ["torch", "transformers", "datasets", "numpy", "pandas", "matplotlib", "cv2", "PIL", "sklearn"]
 force-single-line = false
 lines-after-imports = 2
 section-order = [
@@ -440,6 +488,10 @@ module = [
     "nvitop.*",
     "pynvml.*",
     "nvidia_ml_py.*",
+    "cupy.*",
+    "kornia.*",
+    "guidance.*",
+    "tiktoken.*",
 ]
 ignore_missing_imports = true
 
@@ -464,6 +516,7 @@ addopts = [
     "--cov=torch_starter",   # Coverage reporting
     "--cov-report=term-missing",
     "--cov-report=html",
+    "--cov-report=xml",      # For CI/CD integration
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
@@ -478,6 +531,8 @@ markers = [
     "benchmark: marks tests as benchmarks",
     "memory_intensive: marks tests that use significant GPU memory",
     "multi_gpu: marks tests that require multiple GPUs",
+    "requires_internet: marks tests that require internet connection",
+    "requires_model: marks tests that require downloading models",
 ]
 
 # Test discovery patterns
@@ -494,7 +549,7 @@ norecursedirs = [
     "checkpoints",
 ]
 
-# Filter warnings
+# Filter warnings with enhanced ML library support
 filterwarnings = [
     "error",
     "ignore::UserWarning",
@@ -504,6 +559,10 @@ filterwarnings = [
     "ignore:.*PyTorch.*:UserWarning",
     "ignore:.*torch.*:UserWarning",
     "ignore::FutureWarning:transformers.*",
+    "ignore::FutureWarning:datasets.*",
+    "ignore::FutureWarning:accelerate.*",
+    "ignore:.*Trying to infer the `batch_size`.*:UserWarning",
+    "ignore:.*The parameter 'pretrained' is deprecated.*:FutureWarning",
 ]
 
 # ==============================================================================
@@ -571,7 +630,7 @@ skips = ["**/test_*.py", "tests/**", "notebooks/**"]
 [tool.black]
 line-length = 100
 target-version = ['py311']
-include = '\.pyi?$'
+include = '\.pyi?
   
 extend-exclude = '''
 /(
@@ -591,3 +650,54 @@ extend-exclude = '''
   | models
 )/
 '''
+
+# ==============================================================================
+# ENVIRONMENT-SPECIFIC CONFIGURATION
+# ==============================================================================
+
+# Development environment configuration
+[tool.setuptools]
+zip-safe = false
+
+# Enhanced package discovery
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["torch_starter*"]
+exclude = ["tests*", "notebooks*", "examples*", "data*", "logs*", "models*"]
+
+# ==============================================================================
+# CUDA AND PYTORCH SPECIFIC CONFIGURATION
+# ==============================================================================
+
+# Environment variables for CUDA optimization
+[tool.cuda]
+version = "12.9"
+architecture = ["7.0", "7.5", "8.0", "8.6", "8.9", "9.0"]
+memory_fraction = 0.9  # Reserve 10% GPU memory for system
+
+# PyTorch specific optimizations
+[tool.pytorch]
+version = "2.8.0"
+cuda_version = "12.9"
+optimizations = [
+    "torch.backends.cudnn.benchmark = True",
+    "torch.backends.cuda.matmul.allow_tf32 = True",
+    "torch.backends.cudnn.allow_tf32 = True"
+]
+
+# Model and data paths
+[tool.paths]
+data_dir = "/workspaces/torch-starter/data"
+model_dir = "/workspaces/torch-starter/models" 
+log_dir = "/workspaces/torch-starter/logs"
+cache_dir = "/home/ubuntu/.cache"
+
+# Development server configuration
+[tool.jupyter]
+port = 8888
+allow_root = true
+notebook_dir = "/workspaces/torch-starter"
+
+[tool.tensorboard]
+log_dir = "/workspaces/torch-starter/logs"
+port = 6006

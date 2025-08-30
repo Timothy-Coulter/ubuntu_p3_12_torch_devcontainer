@@ -27,42 +27,88 @@ ensure_file() {
   fi
 }
 
+validate_token() {
+  local token="$1"
+  local service="$2"
+  
+  # Input sanitization
+  if [[ ! "$token" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    warn "Token contains potentially dangerous characters"
+    return 1
+  fi
+  
+  case "$service" in
+    "huggingface")
+      if [[ ! "$token" =~ ^hf_[a-zA-Z0-9]{37}$ ]]; then
+        warn "Hugging Face token format looks incorrect (should start with hf_ and be 40 chars total)"
+        return 1
+      fi
+      ;;
+    "openai")
+      if [[ ! "$token" =~ ^sk-[a-zA-Z0-9]{48,}$ ]] && [[ ! "$token" =~ ^sk-proj-[a-zA-Z0-9_-]{43,}$ ]]; then
+        warn "OpenAI token format looks incorrect"
+        return 1
+      fi
+      ;;
+    "wandb")
+      if [[ ${#token} -lt 32 || ${#token} -gt 50 ]]; then
+        warn "Weights & Biases token length looks incorrect"
+        return 1
+      fi
+      ;;
+    "anthropic")
+      if [[ ! "$token" =~ ^sk-ant-[a-zA-Z0-9_-]{93,}$ ]]; then
+        warn "Anthropic token format looks incorrect"
+        return 1
+      fi
+      ;;
+  esac
+  
+  return 0
+}
+
+# Secure temporary file handling
 write_env() {
   local key="$1"
   local val="$2"
   
-  # Validate inputs
+  # Enhanced validation
   if [[ -z "$key" || -z "$val" ]]; then
     warn "Skipping empty key or value: $key"
     return 0
   fi
   
-  # Escape special characters in value
-  local escaped_val
-  escaped_val=$(printf '%s\n' "$val" | sed 's/[[\.*^$()+?{|]/\\&/g')
+  # Validate key format
+  if [[ ! "$key" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+    warn "Invalid environment variable name: $key"
+    return 1
+  fi
   
-  # Create temporary file
-  local tmp_file="${ENV_FILE}.tmp"
+  # Create secure temporary file with explicit permissions
+  local tmp_file
+  tmp_file=$(mktemp "${ENV_FILE}.XXXXXX") || {
+    fail "Cannot create secure temporary file"
+    return 1
+  }
+  chmod 600 "$tmp_file"
   
   # Remove any existing line for key, then append
   if [[ -f "$ENV_FILE" ]]; then
-    grep -v -E "^${key}=" "$ENV_FILE" 2>/dev/null > "$tmp_file" || touch "$tmp_file"
-  else
-    touch "$tmp_file"
+    grep -v -E "^${key}=" "$ENV_FILE" 2>/dev/null > "$tmp_file" || :
   fi
   
-  # Add new key-value pair
-  printf "%s=%s\n" "$key" "$val" >> "$tmp_file"
+  # Add new key-value pair with proper escaping
+  printf "%s=%q\n" "$key" "$val" >> "$tmp_file"
   
-  # Move temp file to final location
-  mv "$tmp_file" "$ENV_FILE" || {
+  # Atomic move with permission preservation
+  if mv "$tmp_file" "$ENV_FILE" 2>/dev/null; then
+    chmod 600 "$ENV_FILE"
+    pass "Securely stored: $key"
+  else
     fail "Failed to write environment variable: $key"
-    rm -f "$tmp_file"
+    rm -f "$tmp_file" 2>/dev/null || :
     return 1
-  }
-  
-  # Ensure secure permissions
-  chmod 600 "$ENV_FILE" || warn "Cannot set secure permissions on $ENV_FILE"
+  fi
 }
 
 secure_kaggle() {

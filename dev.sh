@@ -5,7 +5,7 @@ set -euo pipefail
 # Global Config
 # ==============================================================================
 
-EXPECTED_CUDA_VERSION="12.6"   # Expected CUDA version for PyTorch & system
+EXPECTED_CUDA_VERSION="12.9"   # Expected CUDA version for PyTorch & system
 
 # ==============================================================================
 # Logging Helpers
