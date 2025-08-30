@@ -47,9 +47,17 @@ check_python_version() {
   local py
   py="$(python_exec)"
   
-  if [[ ! -x "$py" ]]; then
-    fail "Python executable not found: $py"
-    return 1
+  # Check if it's a path (contains '/') or a command name
+  if [[ "$py" == */* ]]; then
+    if [[ ! -x "$py" ]]; then
+      fail "Python executable not found: $py"
+      return 1
+    fi
+  else
+    if ! command -v "$py" &>/dev/null; then
+      fail "Python executable not found: $py"
+      return 1
+    fi
   fi
   
   info "Using Python at: ${py}"
